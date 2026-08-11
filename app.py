@@ -20,90 +20,102 @@ if 'sudah_login' not in st.session_state:
     st.session_state['username'] = ""
     st.session_state['role'] = ""
 
-st.set_page_config(page_title="Portal Puskesmas Ciledug", page_icon="🏥", layout="wide")
+st.set_page_config(page_title="Portal Internal Puskesmas", page_icon="🏥", layout="wide")
 
 # ==========================================
-# CUSTOM CSS (UNTUK MEMPERCANTIK TAMPILAN)
+# CUSTOM CSS (TAMPILAN FRESH & MODERN)
 # ==========================================
 st.markdown("""
     <style>
-    /* Mempercantik tombol */
+    /* Latar belakang yang lebih bersih */
+    .stApp { background-color: #f8fafc; }
+    
+    /* Tombol modern */
     .stButton>button {
         border-radius: 8px;
-        font-weight: bold;
-        transition: 0.3s;
+        font-weight: 600;
+        border: none;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s ease-in-out;
     }
-    .stButton>button:hover {
-        transform: scale(1.02);
-    }
-    /* Mempercantik kotak metrik/statistik */
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+    
+    /* Kotak Metrik / Statistik */
     div[data-testid="metric-container"] {
-        background-color: #e0f2fe;
+        background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+        border-left: 5px solid #0ea5e9;
         border-radius: 10px;
-        padding: 15px;
-        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+        padding: 20px;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
     }
+    
+    /* Box Kepatuhan */
+    .box-sudah { background-color: #dcfce7; padding: 15px; border-radius: 10px; border: 1px solid #bbf7d0; }
+    .box-belum { background-color: #fee2e2; padding: 15px; border-radius: 10px; border: 1px solid #fecaca; }
     </style>
 """, unsafe_allow_html=True)
 
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/2966/2966327.png", width=100) # Tambah logo di menu
-st.sidebar.title("Navigasi Utama")
-menu = st.sidebar.radio("", ["Upload Laporan", "Sistem Internal (Login)"])
+st.sidebar.title("🏥 Portal Internal")
+menu = st.sidebar.radio("Navigasi:", ["Upload Laporan Bulanan", "Dashboard Admin"])
+
+# --- DAFTAR PROGRAM MASTER (Bisa bos tambah/ubah nanti) ---
+DAFTAR_PROGRAM = [
+    "Farmasi", "Gizi", "Ausrem", "KIA/KB", "Promkes", 
+    "Kesling", "P2P", "Laboratorium", "Tata Usaha"
+]
 
 # ==========================================
-# HALAMAN UPLOAD LAPORAN
+# HALAMAN 1: UPLOAD LAPORAN
 # ==========================================
-if menu == "Upload Laporan":
-    st.title("🏥 Portal Pelaporan Puskesmas Ciledug")
-    st.markdown("Selamat datang! Silakan gunakan portal ini untuk mengunggah dokumen laporan bulanan instansi Anda secara aman.")
-    
-    st.info("💡 **INFO PENTING:** Mulai bulan depan, harap gunakan format template standar di bawah ini.")
-    template_df = pd.DataFrame({"Tanggal Laporan": [], "Jumlah Kunjungan Pasien": [], "Catatan/Kendala": []})
-    st.download_button("📥 Download Template Laporan Standar", data=template_df.to_csv(index=False).encode('utf-8'), file_name='Template_Laporan_Puskesmas.csv', mime='text/csv')
+if menu == "Upload Laporan Bulanan":
+    st.title("📤 Portal Laporan Internal Puskesmas")
+    st.markdown("Silakan unggah dokumen laporan bulanan dari unit/program Anda di sini.")
     
     st.write("---")
     
-    col1, col2 = st.columns([1, 2]) # Membagi layar agar form tidak terlalu lebar
+    col1, col2 = st.columns([1, 2])
     with col1:
-        daftar_puskesmas = ["Pilih Puskesmas...", "Puskesmas Ciledug", "Puskesmas Pabuaran", "Puskesmas Karangsembung", "Puskesmas Waled", "Puskesmas Lainnya"]
-        instansi = st.selectbox("Nama Instansi:", daftar_puskesmas)
-    with col2:
-        file_upload = st.file_uploader("Pilih File Laporan", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
+        pilihan_program = ["Pilih Program..."] + DAFTAR_PROGRAM + ["Program Lainnya"]
+        instansi = st.selectbox("Pilih Unit / Program:", pilihan_program)
+        bulan_laporan = st.selectbox("Laporan Untuk Bulan:", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
     
-    if st.button("🚀 Kirim Laporan Sekarang", type="primary"):
-        if instansi == "Pilih Puskesmas...":
-            st.warning("⚠️ Harap pilih nama instansi terlebih dahulu!")
+    with col2:
+        file_upload = st.file_uploader("Pilih File Dokumen (Excel/PDF/Word)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
+    
+    if st.button("🚀 Unggah Laporan", type="primary"):
+        if instansi == "Pilih Program...":
+            st.warning("⚠️ Harap pilih Unit/Program terlebih dahulu!")
         elif file_upload is None:
-            st.warning("⚠️ Harap masukkan file laporan yang ingin dikirim!")
+            st.warning("⚠️ Harap masukkan file laporan!")
         else:
-            with st.spinner('Memproses dan mengamankan data...'):
+            with st.spinner('Menyimpan ke server aman...'):
                 try:
-                    nama_file_unik = f"{instansi}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_upload.name}"
+                    # Nama file dibuat super rapi: Program_Bulan_Tahun_NamaFile Asli
+                    tahun_sekarang = datetime.now().strftime('%Y')
+                    nama_file_unik = f"{instansi}_{bulan_laporan}_{tahun_sekarang}_{datetime.now().strftime('%H%M%S')}_{file_upload.name}"
                     file_bytes = file_upload.read()
+                    
                     supabase.storage.from_("laporan_files").upload(path=nama_file_unik, file=file_bytes)
-                    supabase.table("status_laporan").insert({"nama_instansi": instansi, "nama_file": nama_file_unik, "status": "Sudah Lapor"}).execute()
-                    st.success(f"✅ Laporan berhasil terkirim! Terima kasih.")
+                    supabase.table("status_laporan").insert({"nama_instansi": instansi, "nama_file": nama_file_unik, "status": bulan_laporan}).execute()
+                    
+                    st.success(f"✅ Laporan {instansi} untuk bulan {bulan_laporan} berhasil disimpan!")
                 except Exception as e:
                     st.error(f"❌ Terjadi kesalahan: {e}")
 
 # ==========================================
-# HALAMAN INTERNAL & LOGIN
+# HALAMAN 2: DASHBOARD & LOGIN
 # ==========================================
-elif menu == "Sistem Internal (Login)":
+elif menu == "Dashboard Admin":
     
     if not st.session_state['sudah_login']:
-        st.title("🔐 Login Dashboard Admin")
-        
-        # Membuat form login lebih rapi di tengah
+        st.title("🔐 Ruang Admin")
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            st.write("Silakan masukkan kredensial Anda.")
+            st.info("Silakan login untuk memantau data laporan bulanan.")
             with st.form("form_login"):
                 input_user = st.text_input("Username")
                 input_pass = st.text_input("Password", type="password")
-                tombol_masuk = st.form_submit_button("Masuk ➡️", use_container_width=True)
-                
-                if tombol_masuk:
+                if st.form_submit_button("Masuk ➡️", use_container_width=True):
                     cek_akun = supabase.table("akun_pengguna").select("*").eq("username", input_user).eq("password", input_pass).execute()
                     if len(cek_akun.data) > 0:
                         st.session_state['sudah_login'] = True
@@ -111,90 +123,95 @@ elif menu == "Sistem Internal (Login)":
                         st.session_state['role'] = cek_akun.data[0]['role']
                         st.rerun()
                     else:
-                        st.error("❌ Username atau Password salah!")
+                        st.error("❌ Kredensial tidak valid!")
                         
     else:
+        # Header Admin
         col_header1, col_header2 = st.columns([3, 1])
         with col_header1:
-            st.title(f"👋 Halo, {st.session_state['username']}!")
-            st.markdown(f"**Hak Akses:** {st.session_state['role']}")
+            st.header(f"📊 Dashboard Pemantauan Laporan")
+            st.markdown(f"Login sebagai: **{st.session_state['username']}** ({st.session_state['role']})")
         with col_header2:
-            st.write("") # Spasi
-            if st.button("🚪 Keluar (Logout)", use_container_width=True):
+            if st.button("🚪 Logout", use_container_width=True):
                 st.session_state['sudah_login'] = False
-                st.session_state['username'] = ""
-                st.session_state['role'] = ""
                 st.rerun()
                 
         st.write("---")
         
-        tab1, tab2 = st.tabs(["📊 Dashboard Data", "⚙️ Pengaturan Akun"])
+        # Ambil Data
+        respon = supabase.table("status_laporan").select("*").order("created_at", desc=True).execute()
+        df = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
         
+        # Buat 3 Tab: Kepatuhan (Baru), Arsip Data, Pengaturan
+        tab1, tab2, tab3 = st.tabs(["🎯 Status Kepatuhan", "📂 Arsip Dokumen", "⚙️ Akun"])
+        
+        # --- TAB 1: STATUS KEPATUHAN (SUDAH VS BELUM LAPOR) ---
         with tab1:
-            try:
-                respon = supabase.table("status_laporan").select("*").order("created_at", desc=True).execute()
-                df = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
+            st.subheader("Cek Kepatuhan Pengumpulan Laporan")
+            pilih_bulan = st.selectbox("Pantau Bulan:", ["Agustus", "Juli", "Juni", "Mei", "April", "Maret", "Februari", "Januari", "September", "Oktober", "November", "Desember"])
+            
+            if not df.empty:
+                # Saring data khusus untuk bulan yang dipilih (yang tersimpan di kolom 'status')
+                df_bulan_ini = df[df['status'] == pilih_bulan]
+                program_sudah = df_bulan_ini['nama_instansi'].unique().tolist()
+                program_belum = [p for p in DAFTAR_PROGRAM if p not in program_sudah]
                 
-                # --- METRIK STATISTIK ---
-                st.subheader("📈 Ringkasan Laporan")
-                metrik1, metrik2, metrik3 = st.columns(3)
-                with metrik1:
-                    st.metric(label="Total Seluruh Laporan", value=len(df) if not df.empty else 0)
-                with metrik2:
-                    if not df.empty:
-                        laporan_hari_ini = sum(pd.to_datetime(df['created_at']).dt.date == datetime.now().date())
-                        st.metric(label="Laporan Masuk Hari Ini", value=laporan_hari_ini)
+                col_sudah, col_belum = st.columns(2)
+                
+                with col_sudah:
+                    st.markdown(f"<div class='box-sudah'><h4>✅ Sudah Lapor ({len(program_sudah)})</h4></div>", unsafe_allow_html=True)
+                    st.write("")
+                    if len(program_sudah) > 0:
+                        for p in program_sudah:
+                            st.success(p, icon="✔️")
                     else:
-                        st.metric(label="Laporan Masuk Hari Ini", value=0)
-                with metrik3:
-                    if not df.empty:
-                        instansi_aktif = df['nama_instansi'].nunique()
-                        st.metric(label="Instansi Aktif", value=instansi_aktif)
+                        st.write("- Belum ada data")
+                        
+                with col_belum:
+                    st.markdown(f"<div class='box-belum'><h4>❌ Belum Lapor ({len(program_belum)})</h4></div>", unsafe_allow_html=True)
+                    st.write("")
+                    if len(program_belum) > 0:
+                        for p in program_belum:
+                            st.error(p, icon="⏳")
                     else:
-                        st.metric(label="Instansi Aktif", value=0)
-                
-                st.write("---")
-                st.subheader("📋 Detail Laporan Masuk")
-                
-                if not df.empty:
-                    kolom_filter1, kolom_filter2 = st.columns(2)
-                    with kolom_filter1:
-                        pilihan_filter = ["Semua Puskesmas"] + list(df['nama_instansi'].unique())
-                        filter_puskesmas = st.selectbox("🔍 Filter Instansi:", pilihan_filter)
-                        
-                    if filter_puskesmas != "Semua Puskesmas":
-                        df = df[df['nama_instansi'] == filter_puskesmas]
-                        
-                    df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y %H:%M:%S')
-                    nama_bucket = "laporan_files"
-                    df['link_download'] = df['nama_file'].apply(lambda x: f"{SUPABASE_URL}/storage/v1/object/public/{nama_bucket}/{x}")
-                    df_tampil = df[['created_at', 'nama_instansi', 'nama_file', 'status', 'link_download']]
-                    df_tampil.columns = ['Waktu Upload (WIB)', 'Nama Instansi', 'Nama File', 'Status', 'Aksi']
-                    
-                    st.dataframe(df_tampil, use_container_width=True, column_config={"Aksi": st.column_config.LinkColumn("File Laporan", display_text="📥 Download")})
-                    
-                    if st.session_state['role'] == 'Admin':
-                        with st.expander("🗑️ Hapus Laporan (Admin Only)"):
-                            hapus_file = st.selectbox("Pilih file yang ingin dihapus:", df['nama_file'].tolist())
-                            if st.button("🚨 Hapus Data Permanen"):
-                                supabase.table("status_laporan").delete().eq("nama_file", hapus_file).execute()
-                                supabase.storage.from_("laporan_files").remove([hapus_file])
-                                st.success("File berhasil dihapus!")
-                                st.rerun()
-                else:
-                    st.info("Belum ada data laporan.")
-            except Exception as e:
-                st.error("Gagal memuat dashboard.")
+                        st.write("- Semua program sudah lapor! 🎉")
+            else:
+                st.info("Belum ada data di database.")
 
+        # --- TAB 2: ARSIP DOKUMEN ---
         with tab2:
-            st.subheader("Manajemen Akun Pengguna")
+            st.subheader("Semua Data Laporan Masuk")
+            if not df.empty:
+                df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y %H:%M')
+                nama_bucket = "laporan_files"
+                df['link_download'] = df['nama_file'].apply(lambda x: f"{SUPABASE_URL}/storage/v1/object/public/{nama_bucket}/{x}")
+                
+                df_tampil = df[['created_at', 'nama_instansi', 'status', 'nama_file', 'link_download']]
+                df_tampil.columns = ['Waktu Upload', 'Program/Unit', 'Bulan Laporan', 'Nama File Asli', 'Aksi']
+                
+                st.dataframe(df_tampil, use_container_width=True, column_config={"Aksi": st.column_config.LinkColumn("Dokumen", display_text="📥 Download")})
+                
+                if st.session_state['role'] == 'Admin':
+                    with st.expander("🗑️ Hapus Laporan Salah Upload"):
+                        hapus_file = st.selectbox("Pilih file yang ingin dihapus:", df['nama_file'].tolist())
+                        if st.button("Hapus Permanen", type="primary"):
+                            supabase.table("status_laporan").delete().eq("nama_file", hapus_file).execute()
+                            supabase.storage.from_("laporan_files").remove([hapus_file])
+                            st.success("File dihapus!")
+                            st.rerun()
+            else:
+                st.info("Belum ada laporan.")
+
+        # --- TAB 3: MANAJEMEN AKUN ---
+        with tab3:
+            st.subheader("Manajemen Hak Akses")
             if st.session_state['role'] == 'Admin':
                 with st.form("form_tambah_akun"):
                     baru_user = st.text_input("Username Baru")
                     baru_pass = st.text_input("Password Baru")
-                    baru_role = st.selectbox("Pilih Hak Akses", ["Kepala Puskesmas", "Admin"])
+                    baru_role = st.selectbox("Hak Akses", ["Kepala Puskesmas", "Admin", "Tim TU"])
                     if st.form_submit_button("Buat Akun ✅"):
                         supabase.table("akun_pengguna").insert({"username": baru_user, "password": baru_pass, "role": baru_role}).execute()
-                        st.success(f"Akun '{baru_user}' berhasil dibuat!")
+                        st.success(f"Akun '{baru_user}' dibuat!")
             else:
-                st.warning("⚠️ Maaf, hanya Admin utama yang memiliki hak akses untuk fitur ini.")
+                st.warning("Hanya Admin utama yang bisa membuat akun baru.")

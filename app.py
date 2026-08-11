@@ -26,9 +26,8 @@ if 'sudah_login' not in st.session_state:
 st.set_page_config(page_title="Portal Internal Puskesmas", page_icon="🏥", layout="wide")
 
 # ==========================================
-# 2. FUNGSI DATABASE (KUNJUNGAN & PENYAKIT)
+# 2. FUNGSI DATABASE (KUNJUNGAN & PENYAKIT) - PERBAIKAN BUG
 # ==========================================
-# Menyimpan data dalam format CSV di Supabase Storage agar bisa diolah secara kumulatif
 def load_db_penyakit():
     try:
         res = supabase.storage.from_("laporan_files").download("db_penyakit.csv")
@@ -38,7 +37,6 @@ def load_db_penyakit():
 
 def update_db_penyakit(df_new, tahun, bulan):
     df_lama = load_db_penyakit()
-    # Hapus data bulan & tahun yang sama jika sudah ada (replace)
     if not df_lama.empty:
         df_lama = df_lama[~((df_lama['Tahun'] == tahun) & (df_lama['Bulan'] == bulan))]
     
@@ -47,8 +45,11 @@ def update_db_penyakit(df_new, tahun, bulan):
     df_final = pd.concat([df_lama, df_new], ignore_index=True)
     
     data = df_final.to_csv(index=False).encode('utf-8')
-    try: supabase.storage.from_("laporan_files").update(path="db_penyakit.csv", file=data)
-    except: supabase.storage.from_("laporan_files").upload(path="db_penyakit.csv", file=data)
+    
+    # PERBAIKAN BUG 409: Hapus file lama dulu (jika ada), baru upload yang baru
+    try: supabase.storage.from_("laporan_files").remove(["db_penyakit.csv"])
+    except: pass
+    supabase.storage.from_("laporan_files").upload(path="db_penyakit.csv", file=data)
 
 def load_db_kunjungan():
     try:
@@ -66,15 +67,18 @@ def update_db_kunjungan(total, tahun, bulan):
     df_final = pd.concat([df_lama, df_new], ignore_index=True)
     
     data = df_final.to_csv(index=False).encode('utf-8')
-    try: supabase.storage.from_("laporan_files").update(path="db_kunjungan.csv", file=data)
-    except: supabase.storage.from_("laporan_files").upload(path="db_kunjungan.csv", file=data)
+    
+    # PERBAIKAN BUG 409: Hapus file lama dulu (jika ada), baru upload yang baru
+    try: supabase.storage.from_("laporan_files").remove(["db_kunjungan.csv"])
+    except: pass
+    supabase.storage.from_("laporan_files").upload(path="db_kunjungan.csv", file=data)
 
 # ==========================================
 # 3. CUSTOM CSS MODERN
 # ==========================================
 st.markdown("""
     <style>
-    .stApp { background-color: #f4f7f6; }
+    .stApp { background-color: #f8fafc; }
     .stButton>button { border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #0284c7; color: white; border: none; }
     .stButton>button:hover { background-color: #0369a1; color: white; transform: translateY(-2px); }
     .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-top: 5px solid #0284c7; }
@@ -88,6 +92,7 @@ st.markdown("""
     .big-metric { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px;}
     .big-metric h3 { margin: 0; font-size: 18px; font-weight: 400; opacity: 0.9; }
     .big-metric h1 { margin: 0; font-size: 48px; font-weight: 800; }
+    div[data-testid="metric-container"] { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-left: 5px solid #0ea5e9; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -254,7 +259,6 @@ elif menu == "Dashboard Admin":
                 if not df_kunjungan.empty:
                     df_kt = df_kunjungan[df_kunjungan['Tahun'] == dash_tahun]
                     if not df_kt.empty:
-                        # Susun agar urutan bulan sesuai kalender
                         df_kt['Bulan'] = pd.Categorical(df_kt['Bulan'], categories=LIST_BULAN, ordered=True)
                         df_kt = df_kt.sort_values('Bulan')
                         
@@ -293,7 +297,7 @@ elif menu == "Dashboard Admin":
             st.write("")
             
             # ==========================================
-            # KONTROL INPUT ADMIN (DISEMBUNYIKAN DI BAWAH)
+            # KONTROL INPUT ADMIN
             # ==========================================
             with st.expander("⚙️ Input Data Dashboard (Admin Only)"):
                 st.write("Gunakan menu ini untuk memasukkan data penyakit dan kunjungan per bulan.")
@@ -337,12 +341,14 @@ elif menu == "Dashboard Admin":
                         if st.form_submit_button("🔄 Ekstrak Angka Kunjungan"):
                             if file_k is not None:
                                 try:
-                                    # Membaca tanpa header karena format barisnya kompleks
+                                    # Membaca tanpa header
                                     df_k = pd.read_excel(file_k, header=None)
                                     total_pasien = 0
                                     found = False
                                     for idx, row in df_k.iterrows():
-                                        row_str = " ".join(row.astype(str)).lower()
+                                        # PERBAIKAN BUG FLOAT FOUND: Memaksa semua nilai menjadi string secara paksa
+                                        row_str = " ".join([str(val) for val in row.values]).lower()
+                                        
                                         if "jumlah kunjungan puskesmas" in row_str and "baru dan lama" in row_str:
                                             # Ambil semua angka di baris tersebut
                                             nums = pd.to_numeric(row, errors='coerce').dropna()
@@ -355,7 +361,7 @@ elif menu == "Dashboard Admin":
                                     
                                     if found:
                                         update_db_kunjungan(total_pasien, k_tahun, k_bulan)
-                                        st.success(f"✅ Angka ditemukan! Total: {total_pasien}. Berhasil disimpan untuk {k_bulan} {k_tahun}.")
+                                        st.success(f"✅ Angka ditemukan! Total: {total_pasien}. Tersimpan untuk {k_bulan} {k_tahun}.")
                                         st.rerun()
                                     else:
                                         st.error("❌ Gagal menemukan kalimat 'Jumlah kunjungan puskesmas (baru dan lama)' di dalam file.")

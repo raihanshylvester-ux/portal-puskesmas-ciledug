@@ -136,7 +136,6 @@ elif menu == "Dashboard Admin":
         
         if not df.empty:
             df['Jenis Laporan'], df['Bulan'], df['Tahun'] = zip(*df['status'].map(urai_status))
-            # Urutkan bulan secara logis menggunakan dictionary
             urutan_bulan = {"Januari":1, "Februari":2, "Maret":3, "April":4, "Mei":5, "Juni":6, "Juli":7, "Agustus":8, "September":9, "Oktober":10, "November":11, "Desember":12, "Tahunan":13}
             df['Urutan_Bulan'] = df['Bulan'].map(urutan_bulan)
             
@@ -183,7 +182,6 @@ elif menu == "Dashboard Admin":
             st.write("Klik pada nama program untuk membuka folder arsipnya.")
             
             if not df.empty:
-                # Kolom pencarian & filter Tahun untuk memudahkan
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
                     filter_tahun = st.selectbox("Tampilkan Arsip Tahun:", ["Semua Tahun"] + DAFTAR_TAHUN, index=0)
@@ -193,38 +191,37 @@ elif menu == "Dashboard Admin":
                     df_arsip = df_arsip[df_arsip['Tahun'] == filter_tahun]
                 
                 if not df_arsip.empty:
-                    # Mengelompokkan berdasarkan Program -> Jenis Laporan -> Tahun
                     grup_utama = df_arsip.groupby(['nama_instansi', 'Jenis Laporan', 'Tahun'])
                     
                     for (program, jenis, tahun), data_grup in grup_utama:
-                        # Membuat Folder Utama (Expander)
                         with st.expander(f"📁 {program} - {jenis} ({tahun})"):
-                            # Mengurutkan berdasarkan bulan yang logis (Januari-Desember)
                             data_grup = data_grup.sort_values('Urutan_Bulan')
                             grup_bulan = data_grup.groupby('Bulan', sort=False)
                             
                             for bulan, data_bulan in grup_bulan:
                                 st.markdown(f"**📂 {bulan}**")
                                 
-                                # Menampilkan list file di dalam bulan tersebut
                                 for _, row in data_bulan.iterrows():
-                                    waktu = pd.to_datetime(row['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y %H:%M')
+                                    # PERBAIKAN ERROR DI SINI:
+                                    waktu_ts = pd.to_datetime(row['created_at'])
+                                    if waktu_ts.tzinfo is None:
+                                        waktu_ts = waktu_ts.tz_localize('UTC')
+                                    waktu = waktu_ts.tz_convert('Asia/Jakarta').strftime('%d-%m-%Y %H:%M')
+                                    
                                     nama_file = row['nama_file']
                                     link_dl = f"{SUPABASE_URL}/storage/v1/object/public/laporan_files/{nama_file}"
                                     
-                                    # Desain tampilan file rapi seperti Explorer
                                     st.markdown(f"""
                                         <div class='file-item'>
                                             &nbsp;&nbsp;&nbsp;&nbsp; 📄 {nama_file} <br>
-                                            &nbsp;&nbsp;&nbsp;&nbsp; <small style="color:gray;">🕒 Diunggah: {waktu}</small> | 
+                                            &nbsp;&nbsp;&nbsp;&nbsp; <small style="color:gray;">🕒 Diunggah: {waktu} WIB</small> | 
                                             <a href="{link_dl}" target="_blank">📥 Download File</a>
                                         </div>
                                     """, unsafe_allow_html=True)
-                                st.write("") # Spasi antar bulan
+                                st.write("")
                 else:
                     st.info(f"Belum ada arsip untuk tahun {filter_tahun}.")
                 
-                # Fitur Tong Sampah tetap disembunyikan di bawah
                 st.write("---")
                 if st.session_state['role'] == 'Admin':
                     with st.expander("🗑️ Hapus Laporan (Admin Only)"):

@@ -26,8 +26,26 @@ if 'sudah_login' not in st.session_state:
 st.set_page_config(page_title="Portal Internal Puskesmas", page_icon="🏥", layout="wide")
 
 # ==========================================
-# 2. FUNGSI DATABASE (KUNJUNGAN & PENYAKIT) - PERBAIKAN BUG
+# 2. FUNGSI DATABASE (KUNJUNGAN & PENYAKIT) - ANTI ERROR 409
 # ==========================================
+def force_save_storage(path_file, data_bytes):
+    # Senjata pamungkas: Coba di-UPDATE dulu, kalau gagal baru di-UPLOAD baru.
+    try:
+        supabase.storage.from_("laporan_files").update(
+            path=path_file, 
+            file=data_bytes, 
+            file_options={"contentType": "text/csv"}
+        )
+    except:
+        try:
+            supabase.storage.from_("laporan_files").upload(
+                path=path_file, 
+                file=data_bytes, 
+                file_options={"contentType": "text/csv"}
+            )
+        except Exception as e:
+            raise Exception(f"Gagal menyimpan ke Supabase: {e}")
+
 def load_db_penyakit():
     try:
         res = supabase.storage.from_("laporan_files").download("db_penyakit.csv")
@@ -43,13 +61,8 @@ def update_db_penyakit(df_new, tahun, bulan):
     df_new['Tahun'] = tahun
     df_new['Bulan'] = bulan
     df_final = pd.concat([df_lama, df_new], ignore_index=True)
-    
     data = df_final.to_csv(index=False).encode('utf-8')
-    
-    # PERBAIKAN BUG 409: Hapus file lama dulu (jika ada), baru upload yang baru
-    try: supabase.storage.from_("laporan_files").remove(["db_penyakit.csv"])
-    except: pass
-    supabase.storage.from_("laporan_files").upload(path="db_penyakit.csv", file=data)
+    force_save_storage("db_penyakit.csv", data)
 
 def load_db_kunjungan():
     try:
@@ -65,13 +78,8 @@ def update_db_kunjungan(total, tahun, bulan):
     
     df_new = pd.DataFrame([{'Tahun': tahun, 'Bulan': bulan, 'Total': total}])
     df_final = pd.concat([df_lama, df_new], ignore_index=True)
-    
     data = df_final.to_csv(index=False).encode('utf-8')
-    
-    # PERBAIKAN BUG 409: Hapus file lama dulu (jika ada), baru upload yang baru
-    try: supabase.storage.from_("laporan_files").remove(["db_kunjungan.csv"])
-    except: pass
-    supabase.storage.from_("laporan_files").upload(path="db_kunjungan.csv", file=data)
+    force_save_storage("db_kunjungan.csv", data)
 
 # ==========================================
 # 3. CUSTOM CSS MODERN
@@ -81,7 +89,7 @@ st.markdown("""
     .stApp { background-color: #f8fafc; }
     .stButton>button { border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #0284c7; color: white; border: none; }
     .stButton>button:hover { background-color: #0369a1; color: white; transform: translateY(-2px); }
-    .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-top: 5px solid #0284c7; }
+    .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-top: 5px solid #0284c7; margin: auto; max-width: 400px; }
     .kepatuhan-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; height: 100%; }
     .progress-bar-bg { background-color: #e2e8f0; border-radius: 10px; height: 14px; width: 100%; overflow: hidden; margin-top: 10px; }
     .progress-bar-fill { background: linear-gradient(90deg, #34d399 0%, #059669 100%); height: 100%; border-radius: 10px; transition: width 0.8s ease-in-out; }
@@ -89,10 +97,9 @@ st.markdown("""
     .badge-belum { background-color: #fef2f2; color: #991b1b; padding: 8px 16px; border-radius: 20px; display: inline-block; margin: 5px; font-weight: bold; font-size: 13px; border: 1px solid #fecaca; }
     .file-item { padding: 8px 0px; border-bottom: 1px solid #f1f5f9; }
     .file-item a { text-decoration: none; color: #0284c7; font-weight: bold; }
-    .big-metric { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px;}
-    .big-metric h3 { margin: 0; font-size: 18px; font-weight: 400; opacity: 0.9; }
-    .big-metric h1 { margin: 0; font-size: 48px; font-weight: 800; }
-    div[data-testid="metric-container"] { background: white; border-radius: 15px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-left: 5px solid #0ea5e9; }
+    .big-metric { background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; padding: 25px; border-radius: 15px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 20px; height: 100%; display: flex; flex-direction: column; justify-content: center;}
+    .big-metric h3 { margin: 0 0 10px 0; font-size: 20px; font-weight: 400; opacity: 0.9; }
+    .big-metric h1 { margin: 0; font-size: 55px; font-weight: 800; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -138,24 +145,22 @@ if menu == "Upload Dokumen":
 elif menu == "Dashboard Admin":
     if not st.session_state['sudah_login']:
         st.write(""); st.write("")
-        col_L1, col_L2, col_L3 = st.columns([1, 1.5, 1])
-        with col_L2:
-            st.markdown("<div class='login-box'>", unsafe_allow_html=True)
-            st.markdown("<h2 style='text-align: center; color: #0284c7;'>🔐 Sistem Internal</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: gray;'>Silakan login untuk mengakses data manajerial.</p>", unsafe_allow_html=True)
-            with st.form("form_login"):
-                input_user = st.text_input("Username")
-                input_pass = st.text_input("Password", type="password")
-                if st.form_submit_button("Masuk ke Dashboard ➡️", use_container_width=True):
-                    cek_akun = supabase.table("akun_pengguna").select("*").eq("username", input_user).eq("password", input_pass).execute()
-                    if len(cek_akun.data) > 0:
-                        st.session_state['sudah_login'] = True
-                        st.session_state['username'] = cek_akun.data[0]['username']
-                        st.session_state['role'] = cek_akun.data[0]['role']
-                        st.rerun()
-                    else:
-                        st.error("❌ Username atau Password salah!")
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<div class='login-box'>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #0284c7;'>🔐 Sistem Internal</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; color: gray;'>Silakan login untuk mengakses data manajerial.</p>", unsafe_allow_html=True)
+        with st.form("form_login"):
+            input_user = st.text_input("Username")
+            input_pass = st.text_input("Password", type="password")
+            if st.form_submit_button("Masuk ke Dashboard ➡️", use_container_width=True):
+                cek_akun = supabase.table("akun_pengguna").select("*").eq("username", input_user).eq("password", input_pass).execute()
+                if len(cek_akun.data) > 0:
+                    st.session_state['sudah_login'] = True
+                    st.session_state['username'] = cek_akun.data[0]['username']
+                    st.session_state['role'] = cek_akun.data[0]['role']
+                    st.rerun()
+                else:
+                    st.error("❌ Username atau Password salah!")
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         # HEADER ADMIN
         col_header1, col_header2 = st.columns([3, 1])
@@ -203,11 +208,11 @@ elif menu == "Dashboard Admin":
             
             st.subheader(f"1. Status Kepatuhan Laporan (Periode {dash_bulan} {dash_tahun})")
             st.markdown(f"""
-            <div style="background: white; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;">
+            <div style="background: white; padding: 25px; border-radius: 15px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 20px;">
                 <h4 style="margin-top: 0; color: #334155;">Tingkat Kepatuhan Unit: <span style="color: #059669;">{persen_patuh}%</span></h4>
                 <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: {persen_patuh}%;"></div></div>
                 <div style="margin-top: 15px;">
-                    <strong>✅ Sudah Lapor ({jml_sudah}):</strong> {" ".join([f"<span class='badge-sudah'>{p}</span>" for p in program_sudah]) if program_sudah else "Belum ada"} <br>
+                    <strong>✅ Sudah Lapor ({jml_sudah}):</strong> {" ".join([f"<span class='badge-sudah'>{p}</span>" for p in program_sudah]) if program_sudah else "Belum ada"} <br><br>
                     <strong>⏳ Belum Lapor ({len(program_belum)}):</strong> {" ".join([f"<span class='badge-belum'>{p}</span>" for p in program_belum]) if program_belum else "Semua sudah lapor!"}
                 </div>
             </div>
@@ -226,7 +231,8 @@ elif menu == "Dashboard Admin":
                 
                 st.markdown(f"""
                 <div class='big-metric'>
-                    <h3>Total Pasien ({dash_bulan})</h3>
+                    <h3>Total Pasien</h3>
+                    <h3>({dash_bulan})</h3>
                     <h1>{kunj_bulan_ini:,}</h1>
                     <p style='margin:0;'>Orang</p>
                 </div>
@@ -242,7 +248,7 @@ elif menu == "Dashboard Admin":
                             x=alt.X('JML:Q', title='Jumlah Kasus', axis=alt.Axis(grid=False)),
                             y=alt.Y('NAMA PENYAKIT:N', sort='-x', title=''),
                             tooltip=['NAMA PENYAKIT', 'JML']
-                        ).properties(height=250)
+                        ).properties(height=280)
                         st.altair_chart(chart_pb, use_container_width=True)
                     else:
                         st.info(f"Belum ada data penyakit untuk {dash_bulan} {dash_tahun}.")
@@ -297,9 +303,9 @@ elif menu == "Dashboard Admin":
             st.write("")
             
             # ==========================================
-            # KONTROL INPUT ADMIN
+            # KONTROL INPUT ADMIN (MENGUNGGAH DATA DASHBOARD)
             # ==========================================
-            with st.expander("⚙️ Input Data Dashboard (Admin Only)"):
+            with st.expander("⚙️ Input Data Dashboard (Admin Only)", expanded=True):
                 st.write("Gunakan menu ini untuk memasukkan data penyakit dan kunjungan per bulan.")
                 inp1, inp2 = st.columns(2)
                 
@@ -341,16 +347,14 @@ elif menu == "Dashboard Admin":
                         if st.form_submit_button("🔄 Ekstrak Angka Kunjungan"):
                             if file_k is not None:
                                 try:
-                                    # Membaca tanpa header
                                     df_k = pd.read_excel(file_k, header=None)
                                     total_pasien = 0
                                     found = False
                                     for idx, row in df_k.iterrows():
-                                        # PERBAIKAN BUG FLOAT FOUND: Memaksa semua nilai menjadi string secara paksa
-                                        row_str = " ".join([str(val) for val in row.values]).lower()
+                                        # PERBAIKAN BUG: Ubah semua data di row jadi teks secara paksa sebelum diproses
+                                        row_str = " ".join([str(val).lower() for val in row.values])
                                         
                                         if "jumlah kunjungan puskesmas" in row_str and "baru dan lama" in row_str:
-                                            # Ambil semua angka di baris tersebut
                                             nums = pd.to_numeric(row, errors='coerce').dropna()
                                             if len(nums) >= 2:
                                                 total_pasien = int(nums.iloc[0] + nums.iloc[1])
@@ -364,8 +368,8 @@ elif menu == "Dashboard Admin":
                                         st.success(f"✅ Angka ditemukan! Total: {total_pasien}. Tersimpan untuk {k_bulan} {k_tahun}.")
                                         st.rerun()
                                     else:
-                                        st.error("❌ Gagal menemukan kalimat 'Jumlah kunjungan puskesmas (baru dan lama)' di dalam file.")
-                                except Exception as e: st.error(f"Error: {e}")
+                                        st.error("❌ Gagal menemukan kalimat 'Jumlah kunjungan puskesmas (baru dan lama)'.")
+                                except Exception as e: st.error(f"Error pembacaan: {e}")
                             else:
                                 st.warning("Pilih file excel kunjungan dulu.")
 

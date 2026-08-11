@@ -18,7 +18,7 @@ supabase = init_connection()
 # ==========================================
 # 2. PENGATURAN HALAMAN & MENU WEB
 # ==========================================
-st.set_page_config(page_title="Portal Pelaporan Puskesmas", page_icon="🏥", layout="wide")
+st.set_page_config(page_title="Portal Pelaporan Puskesmas Ciledug", page_icon="🏥", layout="wide")
 
 st.sidebar.title("Navigasi 🏥")
 menu = st.sidebar.radio("Pilih Halaman:", ["Upload Laporan", "Dashboard Admin"])
@@ -27,13 +27,29 @@ menu = st.sidebar.radio("Pilih Halaman:", ["Upload Laporan", "Dashboard Admin"])
 # 3. HALAMAN UPLOAD LAPORAN
 # ==========================================
 if menu == "Upload Laporan":
-    st.title("📤 Portal Upload Laporan Puskesmas")
-    st.write("Silakan pilih instansi dan upload file laporan Anda.")
+    st.title("📤 Portal Pelaporan Puskesmas Ciledug")
     
-    daftar_puskesmas = ["Pilih Puskesmas...", "Puskesmas A", "Puskesmas B", "Puskesmas C"]
+    # --- BAGIAN BARU: Info Template Standar ---
+    st.info("💡 **INFO PENTING:** Mulai bulan depan, harap gunakan format template standar sebelum mengupload laporan.")
+    
+    # Membuat template kosong untuk didownload petugas
+    template_df = pd.DataFrame({"Tanggal Laporan": [], "Jumlah Kunjungan Pasien": [], "Catatan/Kendala": []})
+    st.download_button(
+        label="📥 Download Template Laporan Standar",
+        data=template_df.to_csv(index=False).encode('utf-8'),
+        file_name='Template_Laporan_Puskesmas.csv',
+        mime='text/csv'
+    )
+    
+    st.write("---") # Garis pembatas
+    
+    st.write("Silakan pilih instansi dan upload file laporan Anda di bawah ini:")
+    
+    # Pilihan Instansi diperbarui
+    daftar_puskesmas = ["Pilih Puskesmas...", "Puskesmas Ciledug", "Puskesmas Pabuaran", "Puskesmas Karangsembung", "Puskesmas Waled", "Puskesmas Lainnya"]
     instansi = st.selectbox("Nama Instansi:", daftar_puskesmas)
     
-    file_upload = st.file_uploader("Pilih File Laporan (PDF/Word/Excel)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx'])
+    file_upload = st.file_uploader("Pilih File Laporan (PDF/Word/Excel/CSV)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
     
     if st.button("Kirim Laporan"):
         if instansi == "Pilih Puskesmas...":
@@ -59,48 +75,49 @@ if menu == "Upload Laporan":
                     st.error(f"❌ Terjadi kesalahan: {e}")
 
 # ==========================================
-# 4. HALAMAN DASHBOARD ADMIN
+# 4. HALAMAN DASHBOARD ADMIN DENGAN PASSWORD
 # ==========================================
 elif menu == "Dashboard Admin":
     st.title("📊 Dashboard Pantauan Laporan")
-    st.write("Berikut adalah daftar instansi yang sudah masuk ke database.")
     
-    if st.button("🔄 Perbarui Data"):
-        st.rerun()
+    # --- BAGIAN BARU: Gembok Password ---
+    PASSWORD_RAHASIA = "ciledug2026" # <--- BOS BISA GANTI PASSWORD INI NANTI
+    
+    input_password = st.text_input("🔑 Masukkan Password Admin:", type="password")
+    
+    if input_password == PASSWORD_RAHASIA:
+        st.success("✅ Akses Diberikan. Selamat datang, Admin!")
+        st.write("Berikut adalah daftar instansi yang sudah masuk ke database.")
         
-    try:
-        respon = supabase.table("status_laporan").select("*").execute()
-        data = respon.data
-        
-        if len(data) > 0:
-            df = pd.DataFrame(data)
+        if st.button("🔄 Perbarui Data"):
+            st.rerun()
             
-            # Merapikan Tanggal (Format Waktu Indonesia Barat)
-            df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y %H:%M:%S')
+        try:
+            respon = supabase.table("status_laporan").select("*").execute()
+            data = respon.data
             
-            # Membuat Link Download Publik
-            nama_bucket = "laporan_files"
-            df['link_download'] = df['nama_file'].apply(lambda x: f"{SUPABASE_URL}/storage/v1/object/public/{nama_bucket}/{x}")
+            if len(data) > 0:
+                df = pd.DataFrame(data)
+                df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y %H:%M:%S')
+                nama_bucket = "laporan_files"
+                df['link_download'] = df['nama_file'].apply(lambda x: f"{SUPABASE_URL}/storage/v1/object/public/{nama_bucket}/{x}")
+                df = df[['created_at', 'nama_instansi', 'nama_file', 'status', 'link_download']]
+                df.columns = ['Waktu Upload (WIB)', 'Nama Instansi', 'Nama File', 'Status', 'Aksi']
+                
+                st.dataframe(
+                    df, 
+                    use_container_width=True,
+                    column_config={
+                        "Aksi": st.column_config.LinkColumn("File Laporan", display_text="📥 Download File")
+                    }
+                )
+                st.info(f"Total laporan masuk: {len(data)} dokumen.")
+            else:
+                st.info("Belum ada laporan yang masuk.")
+                
+        except Exception as e:
+            st.error(f"❌ Gagal mengambil data: {e}")
             
-            # Mengatur ulang urutan kolom
-            df = df[['created_at', 'nama_instansi', 'nama_file', 'status', 'link_download']]
-            df.columns = ['Waktu Upload (WIB)', 'Nama Instansi', 'Nama File', 'Status', 'Aksi']
-            
-            # Menampilkan tabel dengan kolom link khusus
-            st.dataframe(
-                df, 
-                use_container_width=True,
-                column_config={
-                    "Aksi": st.column_config.LinkColumn(
-                        "File Laporan", 
-                        display_text="📥 Download File" 
-                    )
-                }
-            )
-            
-            st.info(f"Total laporan masuk: {len(data)} dokumen.")
-        else:
-            st.info("Belum ada laporan yang masuk.")
-            
-    except Exception as e:
-        st.error(f"❌ Gagal mengambil data: {e}")
+    # Jika password diisi tapi salah
+    elif input_password != "":
+        st.error("❌ Password Salah! Anda tidak memiliki izin untuk melihat halaman ini.")

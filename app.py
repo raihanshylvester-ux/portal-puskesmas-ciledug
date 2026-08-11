@@ -63,7 +63,7 @@ if menu == "Upload Dokumen":
         
         jenis_laporan = st.radio("2. Kategori Laporan:", ["Bulanan", "Tahunan"], horizontal=True)
         
-        tahun_laporan = st.selectbox("3. Pilih Tahun:", DAFTAR_TAHUN, index=2) # Default 2026
+        tahun_laporan = st.selectbox("3. Pilih Tahun:", DAFTAR_TAHUN, index=2) 
         
         if jenis_laporan == "Bulanan":
             bulan_laporan = st.selectbox("4. Pilih Bulan:", ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"])
@@ -73,7 +73,7 @@ if menu == "Upload Dokumen":
     with col2:
         file_upload = st.file_uploader("5. Pilih File Dokumen (Excel/PDF/Word)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
         
-        st.write("") # Spasi
+        st.write("") 
         if st.button("🚀 Unggah Dokumen ke Server", type="primary", use_container_width=True):
             if instansi == "Pilih Program...":
                 st.warning("⚠️ Harap pilih Unit/Program terlebih dahulu!")
@@ -82,14 +82,11 @@ if menu == "Upload Dokumen":
             else:
                 with st.spinner('Menyimpan ke brankas digital...'):
                     try:
-                        # Membuat format status gabungan rapi untuk dipecah nanti
                         status_gabungan = f"{jenis_laporan}|{bulan_laporan}|{tahun_laporan}"
-                        
                         nama_file_unik = f"{instansi}_{jenis_laporan}_{bulan_laporan}_{tahun_laporan}_{datetime.now().strftime('%H%M%S')}_{file_upload.name}"
                         file_bytes = file_upload.read()
                         
                         supabase.storage.from_("laporan_files").upload(path=nama_file_unik, file=file_bytes)
-                        # Simpan status_gabungan ke database
                         supabase.table("status_laporan").insert({"nama_instansi": instansi, "nama_file": nama_file_unik, "status": status_gabungan}).execute()
                         
                         st.success(f"✅ Berhasil! Arsip {instansi} ({jenis_laporan} - {tahun_laporan}) telah tersimpan.")
@@ -128,16 +125,15 @@ elif menu == "Dashboard Admin":
                 
         st.write("---")
         
-        # Fungsi Pintar untuk memecah teks status gabungan
         def urai_status(teks):
             try:
                 parts = str(teks).split('|')
                 if len(parts) == 3: return parts[0], parts[1], parts[2]
-                return "Bulanan", teks, "2026" # Fallback data lama
+                return "Bulanan", teks, "2026" 
             except:
                 return "-", "-", "-"
 
-        respon = supabase.table("status_laporan").select("*").order("created_at", desc=True).execute()
+        respon = supabase.table("status_laporan").select("*").execute()
         df = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
         
         if not df.empty:
@@ -162,7 +158,6 @@ elif menu == "Dashboard Admin":
                     pantau_bulan = "Tahunan"
             
             if not df.empty:
-                # Membuat format target yang dicari
                 target_status = f"{pantau_jenis}|{pantau_bulan}|{pantau_tahun}"
                 df_target = df[df['status'] == target_status]
                 
@@ -188,6 +183,9 @@ elif menu == "Dashboard Admin":
         with tab2:
             st.subheader("Semua Data Arsip")
             if not df.empty:
+                # BAGIAN BARU: Mengelompokkan berdasarkan Nama Program (A-Z), lalu berdasarkan waktu upload terbaru
+                df = df.sort_values(by=['nama_instansi', 'created_at'], ascending=[True, False])
+                
                 df['Waktu'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y')
                 nama_bucket = "laporan_files"
                 df['link_download'] = df['nama_file'].apply(lambda x: f"{SUPABASE_URL}/storage/v1/object/public/{nama_bucket}/{x}")
@@ -195,7 +193,13 @@ elif menu == "Dashboard Admin":
                 df_tampil = df[['Waktu', 'nama_instansi', 'Jenis Laporan', 'Bulan', 'Tahun', 'nama_file', 'link_download']]
                 df_tampil.columns = ['Tgl Upload', 'Program/Unit', 'Kategori', 'Bulan', 'Tahun', 'Nama File Asli', 'Aksi']
                 
-                st.dataframe(df_tampil, use_container_width=True, column_config={"Aksi": st.column_config.LinkColumn("Dokumen", display_text="📥 Download")})
+                # BAGIAN BARU: Filter khusus Program di Tab Arsip
+                filter_program = st.selectbox("🔍 Filter Spesifik Program:", ["Tampilkan Semua"] + sorted(df['nama_instansi'].unique().tolist()))
+                if filter_program != "Tampilkan Semua":
+                    df_tampil = df_tampil[df_tampil['Program/Unit'] == filter_program]
+
+                # Menampilkan tabel tanpa nomor index (hide_index) agar lebih rapi
+                st.dataframe(df_tampil, use_container_width=True, hide_index=True, column_config={"Aksi": st.column_config.LinkColumn("Dokumen", display_text="📥 Download")})
                 
                 if st.session_state['role'] == 'Admin':
                     with st.expander("🗑️ Hapus Laporan Salah Upload"):

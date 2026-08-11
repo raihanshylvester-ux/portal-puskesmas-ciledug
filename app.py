@@ -2,9 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 import pandas as pd
 from datetime import datetime
-import json
 import altair as alt
-from io import BytesIO
 
 # ==========================================
 # 1. KONFIGURASI SUPABASE
@@ -26,64 +24,7 @@ if 'sudah_login' not in st.session_state:
 st.set_page_config(page_title="Portal Internal Puskesmas", page_icon="🏥", layout="wide")
 
 # ==========================================
-# 2. FUNGSI DATABASE (PAKSA TIMPA / UPSERT)
-# ==========================================
-def force_save_storage(path_file, data_bytes):
-    # Ini adalah kunci untuk mengatasi Error 409 Duplicate. 
-    # Parameter "upsert": "true" memaksa Supabase untuk menimpa file lama.
-    try:
-        supabase.storage.from_("laporan_files").upload(
-            path=path_file, 
-            file=data_bytes, 
-            file_options={"content-type": "text/csv", "upsert": "true"}
-        )
-    except:
-        try:
-            supabase.storage.from_("laporan_files").update(
-                path=path_file, 
-                file=data_bytes, 
-                file_options={"content-type": "text/csv", "upsert": "true"}
-            )
-        except Exception as e:
-            raise Exception(f"Gagal menimpa data di server: {e}")
-
-def load_db_penyakit():
-    try:
-        res = supabase.storage.from_("laporan_files").download("db_penyakit.csv")
-        return pd.read_csv(BytesIO(res))
-    except:
-        return pd.DataFrame(columns=['Tahun', 'Bulan', 'NAMA PENYAKIT', 'JML'])
-
-def update_db_penyakit(df_new, tahun, bulan):
-    df_lama = load_db_penyakit()
-    if not df_lama.empty:
-        df_lama = df_lama[~((df_lama['Tahun'] == tahun) & (df_lama['Bulan'] == bulan))]
-    
-    df_new['Tahun'] = tahun
-    df_new['Bulan'] = bulan
-    df_final = pd.concat([df_lama, df_new], ignore_index=True)
-    data = df_final.to_csv(index=False).encode('utf-8')
-    force_save_storage("db_penyakit.csv", data)
-
-def load_db_kunjungan():
-    try:
-        res = supabase.storage.from_("laporan_files").download("db_kunjungan.csv")
-        return pd.read_csv(BytesIO(res))
-    except:
-        return pd.DataFrame(columns=['Tahun', 'Bulan', 'Total'])
-
-def update_db_kunjungan(total, tahun, bulan):
-    df_lama = load_db_kunjungan()
-    if not df_lama.empty:
-        df_lama = df_lama[~((df_lama['Tahun'] == tahun) & (df_lama['Bulan'] == bulan))]
-    
-    df_new = pd.DataFrame([{'Tahun': tahun, 'Bulan': bulan, 'Total': total}])
-    df_final = pd.concat([df_lama, df_new], ignore_index=True)
-    data = df_final.to_csv(index=False).encode('utf-8')
-    force_save_storage("db_kunjungan.csv", data)
-
-# ==========================================
-# 3. CUSTOM CSS MODERN
+# 2. CUSTOM CSS MODERN
 # ==========================================
 st.markdown("""
     <style>
@@ -141,7 +82,7 @@ if menu == "Upload Dokumen":
                 st.warning("⚠️ Mohon lengkapi pilihan instansi dan file!")
 
 # ==========================================
-# HALAMAN 2: DASHBOARD ADMIN (FULL MODERN)
+# HALAMAN 2: DASHBOARD ADMIN (FULL MODERN & HACK DATABASE)
 # ==========================================
 elif menu == "Dashboard Admin":
     if not st.session_state['sudah_login']:
@@ -177,22 +118,54 @@ elif menu == "Dashboard Admin":
         
         tab1, tab2, tab3 = st.tabs(["📈 Dashboard Eksekutif", "📂 Arsip Folder", "⚙️ Akun"])
         
+        # --- MESIN PENGOLAH DATA (JALUR BELAKANG) ---
+        respon = supabase.table("status_laporan").select("*").execute()
+        df_all = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
+        
+        # Memisahkan Data Dokumen Asli dan Data Sistem (Kunjungan & Penyakit)
+        if not df_all.empty:
+            df_status = df_all[~df_all['nama_instansi'].str.startswith('SYS_')]
+            df_sys_kunj = df_all[df_all['nama_instansi'] == 'SYS_KUNJUNGAN']
+            df_sys_peny = df_all[df_all['nama_instansi'] == 'SYS_PENYAKIT']
+        else:
+            df_status = pd.DataFrame(); df_sys_kunj = pd.DataFrame(); df_sys_peny = pd.DataFrame()
+
+        # Merakit DataFrame Kunjungan
+        kunj_list = []
+        if not df_sys_kunj.empty:
+            df_sys_kunj = df_sys_kunj.sort_values('created_at', ascending=False).drop_duplicates(subset=['status'])
+            for _, row in df_sys_kunj.iterrows():
+                p = row['status'].split('|')
+                if len(p) == 2:
+                    try: kunj_list.append({'Tahun': p[0], 'Bulan': p[1], 'Total': int(row['nama_file'])})
+                    except: pass
+        df_kunjungan = pd.DataFrame(kunj_list) if kunj_list else pd.DataFrame(columns=['Tahun', 'Bulan', 'Total'])
+
+        # Merakit DataFrame Penyakit
+        peny_list = []
+        if not df_sys_peny.empty:
+            for _, row in df_sys_peny.iterrows():
+                p = row['status'].split('|')
+                if len(p) == 3:
+                    f_p = row['nama_file'].split('|')
+                    if len(f_p) == 2:
+                        try: peny_list.append({'Tahun': p[0], 'Bulan': p[1], 'Batch': p[2], 'NAMA PENYAKIT': f_p[0], 'JML': int(f_p[1])})
+                        except: pass
+        
+        df_penyakit = pd.DataFrame(columns=['Tahun', 'Bulan', 'NAMA PENYAKIT', 'JML'])
+        if peny_list:
+            df_p_all = pd.DataFrame(peny_list)
+            latest_b = df_p_all.groupby(['Tahun', 'Bulan'])['Batch'].max().reset_index()
+            df_penyakit = pd.merge(df_p_all, latest_b, on=['Tahun', 'Bulan', 'Batch'])
+
         # --- TAB 1: DASHBOARD EKSEKUTIF (5 BAGIAN KUMULATIF) ---
         with tab1:
-            # 1. FILTER UTAMA 
             f1, f2 = st.columns(2)
             with f1:
                 dash_tahun = st.selectbox("📅 Pilih Tahun Pantauan:", DAFTAR_TAHUN, index=2)
             with f2:
                 dash_bulan = st.selectbox("📆 Pilih Bulan Pantauan:", LIST_BULAN)
-            
             st.write("---")
-            
-            # AMBIL DATA KUMULATIF DARI DATABASE
-            respon = supabase.table("status_laporan").select("*").execute()
-            df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
-            df_kunjungan = load_db_kunjungan()
-            df_penyakit = load_db_penyakit()
             
             # --- BAGIAN 1: KEPATUHAN BULANAN ---
             program_sudah = []
@@ -221,19 +194,16 @@ elif menu == "Dashboard Admin":
             
             # --- BAGIAN 2 & 3: KUNJUNGAN & PENYAKIT BULANAN ---
             col_b1, col_b2 = st.columns([1, 2.5])
-            
             with col_b1:
                 st.subheader(f"2. Kunjungan Bulanan")
                 kunj_bulan_ini = 0
                 if not df_kunjungan.empty:
                     df_kb = df_kunjungan[(df_kunjungan['Tahun'] == dash_tahun) & (df_kunjungan['Bulan'] == dash_bulan)]
-                    if not df_kb.empty:
-                        kunj_bulan_ini = int(df_kb['Total'].sum())
+                    if not df_kb.empty: kunj_bulan_ini = int(df_kb['Total'].sum())
                 
                 st.markdown(f"""
                 <div class='big-metric'>
-                    <h3>Total Pasien</h3>
-                    <h3>({dash_bulan})</h3>
+                    <h3>Total Pasien ({dash_bulan})</h3>
                     <h1>{kunj_bulan_ini:,}</h1>
                     <p style='margin:0;'>Orang</p>
                 </div>
@@ -251,16 +221,13 @@ elif menu == "Dashboard Admin":
                             tooltip=['NAMA PENYAKIT', 'JML']
                         ).properties(height=280)
                         st.altair_chart(chart_pb, use_container_width=True)
-                    else:
-                        st.info(f"Belum ada data penyakit untuk {dash_bulan} {dash_tahun}.")
-                else:
-                    st.info("Database penyakit masih kosong.")
+                    else: st.info(f"Belum ada data penyakit untuk {dash_bulan} {dash_tahun}.")
+                else: st.info("Database penyakit masih kosong.")
             
             st.write("---")
             
             # --- BAGIAN 4 & 5: KUMULATIF TAHUNAN ---
             col_t1, col_t2 = st.columns(2)
-            
             with col_t1:
                 st.subheader(f"4. Tren Kunjungan Tahunan ({dash_tahun})")
                 if not df_kunjungan.empty:
@@ -268,7 +235,6 @@ elif menu == "Dashboard Admin":
                     if not df_kt.empty:
                         df_kt['Bulan'] = pd.Categorical(df_kt['Bulan'], categories=LIST_BULAN, ordered=True)
                         df_kt = df_kt.sort_values('Bulan')
-                        
                         chart_kt = alt.Chart(df_kt).mark_area(
                             line={'color':'#10b981'},
                             color=alt.Gradient(gradient='linear', stops=[alt.GradientStop(color='#10b981', offset=0), alt.GradientStop(color='white', offset=1)], x1=1, x2=1, y1=1, y2=0)
@@ -279,10 +245,8 @@ elif menu == "Dashboard Admin":
                         ).properties(height=300)
                         st.altair_chart(chart_kt, use_container_width=True)
                         st.success(f"**Total Kumulatif {dash_tahun}: {int(df_kt['Total'].sum()):,} Pasien**")
-                    else:
-                        st.info(f"Belum ada data kunjungan di tahun {dash_tahun}.")
-                else:
-                    st.info("Database kunjungan masih kosong.")
+                    else: st.info(f"Belum ada data kunjungan di tahun {dash_tahun}.")
+                else: st.info("Database kunjungan masih kosong.")
                     
             with col_t2:
                 st.subheader(f"5. 10 Besar Penyakit Tahunan ({dash_tahun})")
@@ -296,15 +260,13 @@ elif menu == "Dashboard Admin":
                             tooltip=['NAMA PENYAKIT', 'JML']
                         ).properties(height=300)
                         st.altair_chart(chart_pt, use_container_width=True)
-                    else:
-                        st.info(f"Belum ada data penyakit di tahun {dash_tahun}.")
-                else:
-                    st.info("Database penyakit masih kosong.")
+                    else: st.info(f"Belum ada data penyakit di tahun {dash_tahun}.")
+                else: st.info("Database penyakit masih kosong.")
                     
             st.write("")
             
             # ==========================================
-            # KONTROL INPUT ADMIN (MENGUNGGAH DATA DASHBOARD)
+            # KONTROL INPUT ADMIN (SISTEM INJEKSI DATABASE)
             # ==========================================
             with st.expander("⚙️ Input Data Dashboard (Admin Only)", expanded=True):
                 st.write("Gunakan menu ini untuk memasukkan data penyakit dan kunjungan per bulan.")
@@ -330,8 +292,19 @@ elif menu == "Dashboard Admin":
                                         df_clean = df_clean[['NAMA PENYAKIT', 'JML']]
                                         df_clean['JML'] = pd.to_numeric(df_clean['JML'], errors='coerce').fillna(0)
                                         df_top10 = df_clean.sort_values('JML', ascending=False).head(10)
-                                        update_db_penyakit(df_top10, p_tahun, p_bulan)
-                                        st.success(f"✅ Data Penyakit {p_bulan} {p_tahun} tersimpan!")
+                                        
+                                        # JALUR HACKER: INJEKSI KE TABEL
+                                        batch_id = datetime.now().strftime("%Y%m%d%H%M%S")
+                                        for _, row in df_top10.iterrows():
+                                            nama = str(row['NAMA PENYAKIT']).replace('|', ' ') # Hindari bentrok pemisah
+                                            jml = int(row['JML'])
+                                            supabase.table("status_laporan").insert({
+                                                "nama_instansi": "SYS_PENYAKIT",
+                                                "status": f"{p_tahun}|{p_bulan}|{batch_id}",
+                                                "nama_file": f"{nama}|{jml}"
+                                            }).execute()
+                                        
+                                        st.success(f"✅ Data Penyakit {p_bulan} {p_tahun} sukses di-inject!")
                                         st.rerun()
                                     else:
                                         st.error("❌ Format gagal. Pastikan ada judul 'NAMA PENYAKIT' dan 'JML'.")
@@ -352,21 +325,23 @@ elif menu == "Dashboard Admin":
                                     total_pasien = 0
                                     found = False
                                     for idx, row in df_k.iterrows():
-                                        # Memaksa semua nilai menjadi string secara paksa untuk menghindari float error
                                         row_str = " ".join([str(val).lower() for val in row.values])
-                                        
                                         if "jumlah kunjungan puskesmas" in row_str and "baru dan lama" in row_str:
                                             nums = pd.to_numeric(row, errors='coerce').dropna()
-                                            if len(nums) >= 2:
-                                                total_pasien = int(nums.iloc[0] + nums.iloc[1])
-                                            elif len(nums) == 1:
-                                                total_pasien = int(nums.iloc[0])
+                                            if len(nums) >= 2: total_pasien = int(nums.iloc[0] + nums.iloc[1])
+                                            elif len(nums) == 1: total_pasien = int(nums.iloc[0])
                                             found = True
                                             break
                                     
                                     if found:
-                                        update_db_kunjungan(total_pasien, k_tahun, k_bulan)
-                                        st.success(f"✅ Angka ditemukan! Total: {total_pasien}. Tersimpan untuk {k_bulan} {k_tahun}.")
+                                        # JALUR HACKER: INJEKSI KE TABEL
+                                        supabase.table("status_laporan").insert({
+                                            "nama_instansi": "SYS_KUNJUNGAN",
+                                            "status": f"{k_tahun}|{k_bulan}",
+                                            "nama_file": str(total_pasien)
+                                        }).execute()
+                                        
+                                        st.success(f"✅ Angka ditemukan! Total: {total_pasien}. Sukses di-inject untuk {k_bulan} {k_tahun}.")
                                         st.rerun()
                                     else:
                                         st.error("❌ Gagal menemukan kalimat 'Jumlah kunjungan puskesmas (baru dan lama)'.")
@@ -374,7 +349,7 @@ elif menu == "Dashboard Admin":
                             else:
                                 st.warning("Pilih file excel kunjungan dulu.")
 
-        # --- TAB 2 & 3: (ARSIP & AKUN TETAP AMAN) ---
+        # --- TAB 2 & 3: ARSIP & AKUN ---
         with tab2:
             st.subheader("📂 Ruang Arsip Digital (Explorer)")
             if not df_status.empty:
@@ -408,14 +383,7 @@ elif menu == "Dashboard Admin":
                                     waktu = wts.tz_convert('Asia/Jakarta').strftime('%d-%m-%Y %H:%M')
                                     nf = row['nama_file']
                                     link_dl = f"{SUPABASE_URL}/storage/v1/object/public/laporan_files/{nf}"
-                                    
-                                    st.markdown(f"""
-                                        <div class='file-item'>
-                                            &nbsp;&nbsp;&nbsp;&nbsp; 📄 {nf} <br>
-                                            &nbsp;&nbsp;&nbsp;&nbsp; <small style="color:gray;">🕒 {waktu} WIB</small> | 
-                                            <a href="{link_dl}" target="_blank">📥 Download File</a>
-                                        </div>
-                                    """, unsafe_allow_html=True)
+                                    st.markdown(f"<div class='file-item'>&nbsp;&nbsp;&nbsp;&nbsp; 📄 {nf} <br>&nbsp;&nbsp;&nbsp;&nbsp; <small style='color:gray;'>🕒 {waktu} WIB</small> | <a href='{link_dl}' target='_blank'>📥 Download File</a></div>", unsafe_allow_html=True)
                 else: st.info(f"Belum ada arsip untuk tahun {filter_tahun_arsip}.")
                 
                 st.write("---")

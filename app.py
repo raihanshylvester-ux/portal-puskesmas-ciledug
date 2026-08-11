@@ -26,25 +26,26 @@ if 'sudah_login' not in st.session_state:
 st.set_page_config(page_title="Portal Internal Puskesmas", page_icon="🏥", layout="wide")
 
 # ==========================================
-# 2. FUNGSI DATABASE (KUNJUNGAN & PENYAKIT) - ANTI ERROR 409
+# 2. FUNGSI DATABASE (PAKSA TIMPA / UPSERT)
 # ==========================================
 def force_save_storage(path_file, data_bytes):
-    # Senjata pamungkas: Coba di-UPDATE dulu, kalau gagal baru di-UPLOAD baru.
+    # Ini adalah kunci untuk mengatasi Error 409 Duplicate. 
+    # Parameter "upsert": "true" memaksa Supabase untuk menimpa file lama.
     try:
-        supabase.storage.from_("laporan_files").update(
+        supabase.storage.from_("laporan_files").upload(
             path=path_file, 
             file=data_bytes, 
-            file_options={"contentType": "text/csv"}
+            file_options={"content-type": "text/csv", "upsert": "true"}
         )
     except:
         try:
-            supabase.storage.from_("laporan_files").upload(
+            supabase.storage.from_("laporan_files").update(
                 path=path_file, 
                 file=data_bytes, 
-                file_options={"contentType": "text/csv"}
+                file_options={"content-type": "text/csv", "upsert": "true"}
             )
         except Exception as e:
-            raise Exception(f"Gagal menyimpan ke Supabase: {e}")
+            raise Exception(f"Gagal menimpa data di server: {e}")
 
 def load_db_penyakit():
     try:
@@ -176,9 +177,9 @@ elif menu == "Dashboard Admin":
         
         tab1, tab2, tab3 = st.tabs(["📈 Dashboard Eksekutif", "📂 Arsip Folder", "⚙️ Akun"])
         
-        # --- TAB 1: DASHBOARD EKSEKUTIF (5 BAGIAN) ---
+        # --- TAB 1: DASHBOARD EKSEKUTIF (5 BAGIAN KUMULATIF) ---
         with tab1:
-            # 1. FILTER UTAMA (Mengendalikan seluruh halaman)
+            # 1. FILTER UTAMA 
             f1, f2 = st.columns(2)
             with f1:
                 dash_tahun = st.selectbox("📅 Pilih Tahun Pantauan:", DAFTAR_TAHUN, index=2)
@@ -187,7 +188,7 @@ elif menu == "Dashboard Admin":
             
             st.write("---")
             
-            # AMBIL SEMUA DATA DARI DATABASE
+            # AMBIL DATA KUMULATIF DARI DATABASE
             respon = supabase.table("status_laporan").select("*").execute()
             df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
             df_kunjungan = load_db_kunjungan()
@@ -351,7 +352,7 @@ elif menu == "Dashboard Admin":
                                     total_pasien = 0
                                     found = False
                                     for idx, row in df_k.iterrows():
-                                        # PERBAIKAN BUG: Ubah semua data di row jadi teks secara paksa sebelum diproses
+                                        # Memaksa semua nilai menjadi string secara paksa untuk menghindari float error
                                         row_str = " ".join([str(val).lower() for val in row.values])
                                         
                                         if "jumlah kunjungan puskesmas" in row_str and "baru dan lama" in row_str:

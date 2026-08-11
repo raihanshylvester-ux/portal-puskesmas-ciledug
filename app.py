@@ -23,7 +23,7 @@ if 'sudah_login' not in st.session_state:
 st.set_page_config(page_title="Portal Internal Puskesmas", page_icon="🏥", layout="wide")
 
 # ==========================================
-# CUSTOM CSS
+# CUSTOM CSS (DITAMBAHKAN DESAIN MODERN)
 # ==========================================
 st.markdown("""
     <style>
@@ -33,12 +33,27 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.2s;
     }
     .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-    div[data-testid="metric-container"] {
-        background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
-        border-left: 5px solid #0ea5e9; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    
+    /* CSS BARU UNTUK KEPATUHAN MODERN */
+    .kepatuhan-card {
+        background: white; padding: 25px; border-radius: 15px; 
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; height: 100%;
     }
-    .box-sudah { background-color: #dcfce7; padding: 15px; border-radius: 10px; border: 1px solid #bbf7d0; }
-    .box-belum { background-color: #fee2e2; padding: 15px; border-radius: 10px; border: 1px solid #fecaca; }
+    .progress-bar-bg {
+        background-color: #e2e8f0; border-radius: 10px; height: 12px; width: 100%; margin-top: 5px; overflow: hidden;
+    }
+    .progress-bar-fill {
+        background: linear-gradient(90deg, #34d399 0%, #059669 100%); height: 100%; border-radius: 10px; transition: width 0.5s;
+    }
+    .badge-sudah {
+        background-color: #ecfdf5; color: #065f46; padding: 6px 14px; border-radius: 20px; 
+        display: inline-block; margin: 4px; font-size: 13px; font-weight: 600; border: 1px solid #a7f3d0;
+    }
+    .badge-belum {
+        background-color: #fef2f2; color: #991b1b; padding: 6px 14px; border-radius: 20px; 
+        display: inline-block; margin: 4px; font-size: 13px; font-weight: 600; border: 1px solid #fecaca;
+    }
+    
     .file-item { padding: 5px 0px; border-bottom: 1px dashed #e2e8f0; }
     .file-item a { text-decoration: none; color: #0284c7; font-weight: bold; }
     </style>
@@ -141,9 +156,11 @@ elif menu == "Dashboard Admin":
             
         tab1, tab2, tab3 = st.tabs(["🎯 Pantau Kepatuhan", "📂 Database Arsip Folder", "⚙️ Akun"])
         
-        # --- TAB 1: STATUS KEPATUHAN ---
+        # --- TAB 1: STATUS KEPATUHAN (DESAIN BARU) ---
         with tab1:
             st.subheader("Cek Kepatuhan Pengumpulan Laporan")
+            st.write("Pilih periode untuk melihat persentase unit yang sudah menyerahkan laporan.")
+            
             c1, c2, c3 = st.columns(3)
             with c1:
                 pantau_tahun = st.selectbox("Pilih Tahun:", DAFTAR_TAHUN, index=2)
@@ -156,6 +173,8 @@ elif menu == "Dashboard Admin":
                     st.write("*(Laporan Tahunan Terpilih)*")
                     pantau_bulan = "Tahunan"
             
+            st.write("") # Spasi
+            
             if not df.empty:
                 target_status = f"{pantau_jenis}|{pantau_bulan}|{pantau_tahun}"
                 df_target = df[df['status'] == target_status]
@@ -163,16 +182,44 @@ elif menu == "Dashboard Admin":
                 program_sudah = df_target['nama_instansi'].unique().tolist()
                 program_belum = [p for p in DAFTAR_PROGRAM if p not in program_sudah]
                 
+                # Menghitung Persentase untuk Progress Bar
+                total_program = len(DAFTAR_PROGRAM)
+                jumlah_sudah = len(program_sudah)
+                persen = int((jumlah_sudah / total_program) * 100) if total_program > 0 else 0
+                
+                # Menampilkan Progress Bar Modern
+                st.markdown(f"""
+                <div style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; margin-bottom: 20px;">
+                    <h4 style="margin-top: 0; color: #334155;">Tingkat Kepatuhan Keseluruhan: <span style="color: #059669;">{persen}%</span></h4>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: {persen}%;"></div>
+                    </div>
+                    <small style="color: #64748b;">{jumlah_sudah} dari {total_program} Program telah melapor.</small>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Menampilkan Kartu Kepatuhan (Kiri: Sudah, Kanan: Belum)
                 col_sudah, col_belum = st.columns(2)
+                
                 with col_sudah:
-                    st.markdown(f"<div class='box-sudah'><h4>✅ Sudah Lapor ({len(program_sudah)})</h4></div>", unsafe_allow_html=True)
-                    for p in program_sudah: st.success(p, icon="✔️")
-                    if not program_sudah: st.write("- Belum ada data")
+                    st.markdown("<div class='kepatuhan-card'>", unsafe_allow_html=True)
+                    st.markdown(f"#### ✅ Sudah Lapor ({jumlah_sudah})")
+                    if jumlah_sudah > 0:
+                        badges = "".join([f"<span class='badge-sudah'>✔️ {p}</span>" for p in program_sudah])
+                        st.markdown(badges, unsafe_allow_html=True)
+                    else:
+                        st.write("- Belum ada data masuk.")
+                    st.markdown("</div>", unsafe_allow_html=True)
                         
                 with col_belum:
-                    st.markdown(f"<div class='box-belum'><h4>❌ Belum Lapor ({len(program_belum)})</h4></div>", unsafe_allow_html=True)
-                    for p in program_belum: st.error(p, icon="⏳")
-                    if not program_belum: st.write("- Semua program sudah lapor! 🎉")
+                    st.markdown("<div class='kepatuhan-card'>", unsafe_allow_html=True)
+                    st.markdown(f"#### ⏳ Belum Lapor ({len(program_belum)})")
+                    if len(program_belum) > 0:
+                        badges = "".join([f"<span class='badge-belum'>⏳ {p}</span>" for p in program_belum])
+                        st.markdown(badges, unsafe_allow_html=True)
+                    else:
+                        st.markdown("<span style='color: #059669; font-weight: bold;'>🎉 Semua program sudah lapor!</span>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.info("Belum ada data di database.")
 
@@ -202,7 +249,6 @@ elif menu == "Dashboard Admin":
                                 st.markdown(f"**📂 {bulan}**")
                                 
                                 for _, row in data_bulan.iterrows():
-                                    # PERBAIKAN ERROR DI SINI:
                                     waktu_ts = pd.to_datetime(row['created_at'])
                                     if waktu_ts.tzinfo is None:
                                         waktu_ts = waktu_ts.tz_localize('UTC')

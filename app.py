@@ -39,6 +39,8 @@ st.markdown("""
     }
     .box-sudah { background-color: #dcfce7; padding: 15px; border-radius: 10px; border: 1px solid #bbf7d0; }
     .box-belum { background-color: #fee2e2; padding: 15px; border-radius: 10px; border: 1px solid #fecaca; }
+    .file-item { padding: 5px 0px; border-bottom: 1px dashed #e2e8f0; }
+    .file-item a { text-decoration: none; color: #0284c7; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,9 +62,7 @@ if menu == "Upload Dokumen":
     with col1:
         pilihan_program = ["Pilih Program..."] + DAFTAR_PROGRAM + ["Program Lainnya"]
         instansi = st.selectbox("1. Pilih Unit / Program:", pilihan_program)
-        
         jenis_laporan = st.radio("2. Kategori Laporan:", ["Bulanan", "Tahunan"], horizontal=True)
-        
         tahun_laporan = st.selectbox("3. Pilih Tahun:", DAFTAR_TAHUN, index=2) 
         
         if jenis_laporan == "Bulanan":
@@ -72,7 +72,6 @@ if menu == "Upload Dokumen":
             
     with col2:
         file_upload = st.file_uploader("5. Pilih File Dokumen (Excel/PDF/Word)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
-        
         st.write("") 
         if st.button("🚀 Unggah Dokumen ke Server", type="primary", use_container_width=True):
             if instansi == "Pilih Program...":
@@ -88,7 +87,6 @@ if menu == "Upload Dokumen":
                         
                         supabase.storage.from_("laporan_files").upload(path=nama_file_unik, file=file_bytes)
                         supabase.table("status_laporan").insert({"nama_instansi": instansi, "nama_file": nama_file_unik, "status": status_gabungan}).execute()
-                        
                         st.success(f"✅ Berhasil! Arsip {instansi} ({jenis_laporan} - {tahun_laporan}) telah tersimpan.")
                     except Exception as e:
                         st.error(f"❌ Terjadi kesalahan: {e}")
@@ -138,13 +136,15 @@ elif menu == "Dashboard Admin":
         
         if not df.empty:
             df['Jenis Laporan'], df['Bulan'], df['Tahun'] = zip(*df['status'].map(urai_status))
+            # Urutkan bulan secara logis menggunakan dictionary
+            urutan_bulan = {"Januari":1, "Februari":2, "Maret":3, "April":4, "Mei":5, "Juni":6, "Juli":7, "Agustus":8, "September":9, "Oktober":10, "November":11, "Desember":12, "Tahunan":13}
+            df['Urutan_Bulan'] = df['Bulan'].map(urutan_bulan)
             
-        tab1, tab2, tab3 = st.tabs(["🎯 Pantau Kepatuhan", "📂 Database Arsip", "⚙️ Akun"])
+        tab1, tab2, tab3 = st.tabs(["🎯 Pantau Kepatuhan", "📂 Database Arsip Folder", "⚙️ Akun"])
         
         # --- TAB 1: STATUS KEPATUHAN ---
         with tab1:
             st.subheader("Cek Kepatuhan Pengumpulan Laporan")
-            
             c1, c2, c3 = st.columns(3)
             with c1:
                 pantau_tahun = st.selectbox("Pilih Tahun:", DAFTAR_TAHUN, index=2)
@@ -167,50 +167,75 @@ elif menu == "Dashboard Admin":
                 col_sudah, col_belum = st.columns(2)
                 with col_sudah:
                     st.markdown(f"<div class='box-sudah'><h4>✅ Sudah Lapor ({len(program_sudah)})</h4></div>", unsafe_allow_html=True)
-                    st.write("")
                     for p in program_sudah: st.success(p, icon="✔️")
                     if not program_sudah: st.write("- Belum ada data")
                         
                 with col_belum:
                     st.markdown(f"<div class='box-belum'><h4>❌ Belum Lapor ({len(program_belum)})</h4></div>", unsafe_allow_html=True)
-                    st.write("")
                     for p in program_belum: st.error(p, icon="⏳")
                     if not program_belum: st.write("- Semua program sudah lapor! 🎉")
             else:
                 st.info("Belum ada data di database.")
 
-        # --- TAB 2: ARSIP DOKUMEN ---
+        # --- TAB 2: ARSIP DOKUMEN (SISTEM FOLDER) ---
         with tab2:
-            st.subheader("Semua Data Arsip")
+            st.subheader("📂 Ruang Arsip Digital")
+            st.write("Klik pada nama program untuk membuka folder arsipnya.")
+            
             if not df.empty:
-                # BAGIAN BARU: Mengelompokkan berdasarkan Nama Program (A-Z), lalu berdasarkan waktu upload terbaru
-                df = df.sort_values(by=['nama_instansi', 'created_at'], ascending=[True, False])
+                # Kolom pencarian & filter Tahun untuk memudahkan
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    filter_tahun = st.selectbox("Tampilkan Arsip Tahun:", ["Semua Tahun"] + DAFTAR_TAHUN, index=0)
                 
-                df['Waktu'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y')
-                nama_bucket = "laporan_files"
-                df['link_download'] = df['nama_file'].apply(lambda x: f"{SUPABASE_URL}/storage/v1/object/public/{nama_bucket}/{x}")
+                df_arsip = df.copy()
+                if filter_tahun != "Semua Tahun":
+                    df_arsip = df_arsip[df_arsip['Tahun'] == filter_tahun]
                 
-                df_tampil = df[['Waktu', 'nama_instansi', 'Jenis Laporan', 'Bulan', 'Tahun', 'nama_file', 'link_download']]
-                df_tampil.columns = ['Tgl Upload', 'Program/Unit', 'Kategori', 'Bulan', 'Tahun', 'Nama File Asli', 'Aksi']
+                if not df_arsip.empty:
+                    # Mengelompokkan berdasarkan Program -> Jenis Laporan -> Tahun
+                    grup_utama = df_arsip.groupby(['nama_instansi', 'Jenis Laporan', 'Tahun'])
+                    
+                    for (program, jenis, tahun), data_grup in grup_utama:
+                        # Membuat Folder Utama (Expander)
+                        with st.expander(f"📁 {program} - {jenis} ({tahun})"):
+                            # Mengurutkan berdasarkan bulan yang logis (Januari-Desember)
+                            data_grup = data_grup.sort_values('Urutan_Bulan')
+                            grup_bulan = data_grup.groupby('Bulan', sort=False)
+                            
+                            for bulan, data_bulan in grup_bulan:
+                                st.markdown(f"**📂 {bulan}**")
+                                
+                                # Menampilkan list file di dalam bulan tersebut
+                                for _, row in data_bulan.iterrows():
+                                    waktu = pd.to_datetime(row['created_at']).dt.tz_convert('Asia/Jakarta').dt.strftime('%d-%m-%Y %H:%M')
+                                    nama_file = row['nama_file']
+                                    link_dl = f"{SUPABASE_URL}/storage/v1/object/public/laporan_files/{nama_file}"
+                                    
+                                    # Desain tampilan file rapi seperti Explorer
+                                    st.markdown(f"""
+                                        <div class='file-item'>
+                                            &nbsp;&nbsp;&nbsp;&nbsp; 📄 {nama_file} <br>
+                                            &nbsp;&nbsp;&nbsp;&nbsp; <small style="color:gray;">🕒 Diunggah: {waktu}</small> | 
+                                            <a href="{link_dl}" target="_blank">📥 Download File</a>
+                                        </div>
+                                    """, unsafe_allow_html=True)
+                                st.write("") # Spasi antar bulan
+                else:
+                    st.info(f"Belum ada arsip untuk tahun {filter_tahun}.")
                 
-                # BAGIAN BARU: Filter khusus Program di Tab Arsip
-                filter_program = st.selectbox("🔍 Filter Spesifik Program:", ["Tampilkan Semua"] + sorted(df['nama_instansi'].unique().tolist()))
-                if filter_program != "Tampilkan Semua":
-                    df_tampil = df_tampil[df_tampil['Program/Unit'] == filter_program]
-
-                # Menampilkan tabel tanpa nomor index (hide_index) agar lebih rapi
-                st.dataframe(df_tampil, use_container_width=True, hide_index=True, column_config={"Aksi": st.column_config.LinkColumn("Dokumen", display_text="📥 Download")})
-                
+                # Fitur Tong Sampah tetap disembunyikan di bawah
+                st.write("---")
                 if st.session_state['role'] == 'Admin':
-                    with st.expander("🗑️ Hapus Laporan Salah Upload"):
-                        hapus_file = st.selectbox("Pilih file yang ingin dihapus:", df['nama_file'].tolist())
-                        if st.button("Hapus Permanen", type="primary"):
+                    with st.expander("🗑️ Hapus Laporan (Admin Only)"):
+                        hapus_file = st.selectbox("Pilih file yang ingin dihapus permanen:", df['nama_file'].tolist())
+                        if st.button("🚨 Hapus Data Permanen", type="primary"):
                             supabase.table("status_laporan").delete().eq("nama_file", hapus_file).execute()
                             supabase.storage.from_("laporan_files").remove([hapus_file])
-                            st.success("File dihapus!")
+                            st.success("File berhasil dihapus!")
                             st.rerun()
             else:
-                st.info("Belum ada laporan.")
+                st.info("Belum ada dokumen yang diunggah ke server.")
 
         # --- TAB 3: MANAJEMEN AKUN ---
         with tab3:

@@ -25,6 +25,37 @@ if 'sudah_login' not in st.session_state:
 st.set_page_config(page_title="Simpel Puskesmas", page_icon="🏥", layout="centered")
 
 # ==========================================
+# KODE JUBAH GAIB: PENGHILANG JEJAK STREAMLIT
+# ==========================================
+st.markdown("""
+    <style>
+    /* 1. Menghilangkan tulisan 'Hosted by Streamlit' dan Footer di bawah */
+    footer {visibility: hidden !important;}
+    
+    /* 2. Menghilangkan Header dan Menu Garis Tiga (Burger Menu) di atas */
+    header {visibility: hidden !important;}
+    #MainMenu {visibility: hidden !important;}
+    
+    /* 3. Menghilangkan badge/logo kecil Streamlit yang suka melayang */
+    .viewerBadge_container__1QSob {display: none !important;}
+    .viewerBadge_link__qRIco {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    
+    /* 4. Mengatur jarak layar agar pas dan penuh di layar HP (seperti aplikasi asli) */
+    .block-container { 
+        padding-top: 1rem !important; 
+        padding-bottom: 1rem !important; 
+    }
+    
+    /* 5. Mengunci layar agar tidak bisa ditarik-tarik (Anti-bouncing) */
+    html, body, [class*="css"] {
+        overscroll-behavior-y: none !important;
+        overscroll-behavior-x: none !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
 # 2. VARIABEL & DAFTAR UNIT
 # ==========================================
 DAFTAR_PROGRAM = ["Farmasi", "Gizi", "Ausrem", "KIA/KB", "Promkes", "Kesling", "P2P", "Laboratorium", "Tata Usaha"]

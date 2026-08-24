@@ -19,6 +19,7 @@ if 'sudah_login' not in st.session_state:
     st.session_state['sudah_login'] = False
     st.session_state['username'] = ""
     st.session_state['role'] = ""
+    st.session_state['id_puskesmas'] = ""
 
 st.set_page_config(page_title="Simpel Puskesmas", page_icon="🏥", layout="centered")
 
@@ -35,7 +36,6 @@ LIST_BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "A
 # ==========================================
 st.markdown("""
     <style>
-    /* 1. OBAT ANTI-RELOAD & BACKGROUND LEMBUT */
     html, body, [class*="css"], [data-testid="stAppViewContainer"], .main, .block-container {
         overscroll-behavior-y: none !important;
         overscroll-behavior-x: none !important;
@@ -45,8 +45,6 @@ st.markdown("""
         background-color: #f8fafc !important; 
         font-family: 'Segoe UI', Roboto, sans-serif; 
     }
-    
-    /* 2. PEMBUNUH WATERMARK STREAMLIT & HEADER/FOOTER */
     header {visibility: hidden !important;}
     footer {visibility: hidden !important;}
     #MainMenu {visibility: hidden !important;}
@@ -55,10 +53,8 @@ st.markdown("""
     [data-testid="stDecoration"] {display: none !important;}
     [data-testid="stToolbar"] {display: none !important;}
     
-    /* 3. PERBAIKAN JARAK AMAN */
     .block-container { padding-top: 15px !important; padding-bottom: 80px !important; }
     
-    /* 4. DESAIN KARTU MODERN (CLEAN UI) */
     .mobile-card {
         background: #ffffff; 
         padding: 24px; 
@@ -68,7 +64,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
     
-    /* 5. DESAIN TOMBOL ALA APLIKASI MAHAL */
     .stButton>button {
         border-radius: 12px !important; 
         background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
@@ -82,13 +77,9 @@ st.markdown("""
     }
     .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(2, 132, 199, 0.3) !important; }
     
-    /* Tombol Logout Merah */
     .btn-logout>button { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; padding: 5px 15px !important;}
-    
-    /* Input & Select Box Lebih Halus */
     .stTextInput input, .stSelectbox select { border-radius: 8px !important; }
     
-    /* Badge Status */
     .badge-sudah { background-color: #ecfdf5; color: #059669; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; border: 1px solid #a7f3d0;}
     .badge-belum { background-color: #fef2f2; color: #dc2626; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; border: 1px solid #fecaca;}
     
@@ -114,6 +105,9 @@ if not st.session_state['sudah_login']:
                 st.session_state['sudah_login'] = True
                 st.session_state['username'] = cek_akun.data[0]['username']
                 st.session_state['role'] = cek_akun.data[0]['role']
+                # Tangkap id_puskesmas dari database (jika kosong, set default PKM_UTAMA)
+                pkm_db = cek_akun.data[0].get('id_puskesmas')
+                st.session_state['id_puskesmas'] = pkm_db if pkm_db else "PKM_UTAMA"
                 st.rerun()
             else:
                 st.error("❌ Username atau Password salah!")
@@ -121,15 +115,18 @@ if not st.session_state['sudah_login']:
     st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA (SETELAH LOGIN)
+# 5. HALAMAN UTAMA (DENGAN ISOLASI DATA MULTI-TENANCY)
 # ==========================================
-respon = supabase.table("status_laporan").select("*").execute()
+pkm_aktif = st.session_state['id_puskesmas']
+
+# Ambil data HANYA milik Puskesmas yang sedang login
+respon = supabase.table("status_laporan").select("*").eq("id_puskesmas", pkm_aktif).execute()
 df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
 
 # HEADER PROFIL
 col_prof1, col_prof2 = st.columns([3, 1.5])
 with col_prof1:
-    st.markdown(f"**Halo, {st.session_state['username']}!** 👋<br><small style='color:#64748b;'>Akses: {st.session_state['role']}</small>", unsafe_allow_html=True)
+    st.markdown(f"**Halo, {st.session_state['username']}!** 👋<br><small style='color:#64748b;'>Instansi: {pkm_aktif} | Akses: {st.session_state['role']}</small>", unsafe_allow_html=True)
 with col_prof2:
     st.markdown("<div class='btn-logout'>", unsafe_allow_html=True)
     if st.button("🚪 Logout"):
@@ -154,7 +151,7 @@ st.write("")
 # ------------------------------------------
 if menu == "📤 Upload Laporan":
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>📤 Kirim Laporan</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>📤 Kirim Laporan</h3>", unsafe_allow_html=True)
     
     if st.session_state['role'] in DAFTAR_PROGRAM:
         instansi = st.selectbox("1. Unit / Program:", [st.session_state['role']], disabled=True)
@@ -172,16 +169,21 @@ if menu == "📤 Upload Laporan":
             with st.spinner('Mengirim ke server aman...'):
                 try:
                     timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
-                    nama_file = f"{instansi}_{jenis_laporan}_{bulan_laporan}_{tahun_laporan}_{timestamp}_{file_upload.name}"
+                    nama_file = f"{pkm_aktif}_{instansi}_{jenis_laporan}_{bulan_laporan}_{tahun_laporan}_{timestamp}_{file_upload.name}"
                     status_gab = f"{jenis_laporan}|{bulan_laporan}|{tahun_laporan}"
                     
                     supabase.storage.from_("laporan_files").upload(path=nama_file, file=file_upload.read())
-                    supabase.table("status_laporan").insert({"nama_instansi": instansi, "nama_file": nama_file, "status": status_gab}).execute()
-                    st.success("✅ Laporan berhasil terkirim!")
+                    supabase.table("status_laporan").insert({
+                        "nama_instansi": instansi, 
+                        "nama_file": nama_file, 
+                        "status": status_gab,
+                        "id_puskesmas": pkm_aktif
+                    }).execute()
+                    st.success("✅ Laporan berhasil terkirim ke server!")
                 except Exception as e:
                     st.error(f"❌ Gagal: {e}")
         else:
-            st.warning("⚠️ Pilih Unit dan masukkan file laporan Anda!")
+            st.warning("⚠️ Mohon lengkapi unit dan masukkan filenya!")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -189,7 +191,7 @@ if menu == "📤 Upload Laporan":
 # ------------------------------------------
 elif menu == "📊 Pantau Kepatuhan":
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>🎯 Pantau Kepatuhan</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>🎯 Pantau Kepatuhan</h3>", unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     with c1: dash_jenis = st.selectbox("Kategori:", ["Bulanan", "Tahunan"])
@@ -208,7 +210,7 @@ elif menu == "📊 Pantau Kepatuhan":
     jml_sudah = len(program_sudah)
     persen = int((jml_sudah / len(DAFTAR_PROGRAM)) * 100)
     
-    st.markdown(f"**Tingkat Kepatuhan: {persen}%**")
+    st.markdown(f"**Tingkat Kepatuhan {pkm_aktif}: {persen}%**")
     st.progress(persen)
     
     st.markdown("#### ✅ Sudah Lapor")
@@ -224,7 +226,7 @@ elif menu == "📊 Pantau Kepatuhan":
     st.write("---")
     data_rekap = [{"Unit": p, "Status": "Sudah Lapor" if p in program_sudah else "Belum Lapor"} for p in DAFTAR_PROGRAM]
     csv_rekap = pd.DataFrame(data_rekap).to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Rekap Excel", data=csv_rekap, file_name=f"Rekap_{dash_bulan}.csv", mime="text/csv")
+    st.download_button("📥 Download Rekap Excel", data=csv_rekap, file_name=f"Rekap_{pkm_aktif}_{dash_bulan}.csv", mime="text/csv")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -232,7 +234,7 @@ elif menu == "📊 Pantau Kepatuhan":
 # ------------------------------------------
 elif menu == "📂 Gudang Arsip":
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>📂 Gudang Arsip</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>📂 Gudang Arsip</h3>", unsafe_allow_html=True)
     
     if not df_status.empty:
         def urai_status(teks):
@@ -266,7 +268,9 @@ elif menu == "📂 Gudang Arsip":
                         for _, row in data_bulan.iterrows():
                             nf = row['nama_file']
                             link_dl = f"{SUPABASE_URL}/storage/v1/object/public/laporan_files/{nf}"
-                            st.markdown(f"<div class='file-item'><span>📄 {nf.split('_', 5)[-1][:20]}...</span><a href='{link_dl}' target='_blank'>Unduh</a></div>", unsafe_allow_html=True)
+                            # Menampilkan nama file asli tanpa prefix id_puskesmas
+                            nama_tampil = "_".join(nf.split('_')[1:]) if len(nf.split('_')) > 1 else nf
+                            st.markdown(f"<div class='file-item'><span>📄 {nama_tampil[:25]}...</span><a href='{link_dl}' target='_blank'>Unduh</a></div>", unsafe_allow_html=True)
         else: st.info(f"Belum ada arsip pada filter ini.")
         
         if st.session_state['role'] == 'Admin':
@@ -282,29 +286,37 @@ elif menu == "📂 Gudang Arsip":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
-# MENU: KELOLA AKUN
+# MENU: KELOLA AKUN (DENGAN INPUT ID PUSKESMAS)
 # ------------------------------------------
 elif menu == "⚙️ Kelola Akun" and st.session_state['role'] == 'Admin':
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>⚙️ Manajemen Akun</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>⚙️ Manajemen Akun Multi-Puskesmas</h3>", unsafe_allow_html=True)
     
     with st.form("form_tambah_akun"):
+        baru_pkm = st.text_input("ID Puskesmas / Instansi (Contoh: PKM_CILEDUG)")
         baru_user = st.text_input("Username (Tanpa Spasi)")
         baru_pass = st.text_input("Password")
         baru_role = st.selectbox("Role / Unit Bagian", DAFTAR_ROLE)
         st.write("")
         if st.form_submit_button("Simpan Akun ✅"):
-            if baru_user and baru_pass:
+            if baru_pkm and baru_user and baru_pass:
                 cek = supabase.table("akun_pengguna").select("*").eq("username", baru_user).execute()
                 if len(cek.data) > 0: st.error("❌ Username sudah terpakai!")
                 else:
-                    supabase.table("akun_pengguna").insert({"username": baru_user.replace(" ", ""), "password": baru_pass, "role": baru_role}).execute()
-                    st.success(f"Akun '{baru_user}' berhasil didaftarkan!")
-            else: st.warning("Mohon isi semua data dengan lengkap.")
+                    supabase.table("akun_pengguna").insert({
+                        "username": baru_user.replace(" ", ""), 
+                        "password": baru_pass, 
+                        "role": baru_role,
+                        "id_puskesmas": baru_pkm.upper().replace(" ", "_")
+                    }).execute()
+                    st.success(f"Akun '{baru_user}' untuk Puskesmas '{baru_pkm}' berhasil didaftarkan!")
+            else: st.warning("Mohon isi semua data (ID Puskesmas, Username, Password) dengan lengkap.")
             
     st.write("---")
     st.markdown("**Daftar Akun Terdaftar:**")
-    res_akun = supabase.table("akun_pengguna").select("username, role").execute()
+    res_akun = supabase.table("akun_pengguna").select("username, role, id_puskesmas").execute()
     if len(res_akun.data) > 0:
-        st.dataframe(pd.DataFrame(res_akun.data), use_container_width=True, hide_index=True)
+        df_akun = pd.DataFrame(res_akun.data)
+        df_akun.columns = ["Username", "Role / Unit", "ID Puskesmas"]
+        st.dataframe(df_akun, use_container_width=True, hide_index=True)
     st.markdown("</div>", unsafe_allow_html=True)

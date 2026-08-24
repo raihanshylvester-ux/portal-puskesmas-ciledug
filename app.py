@@ -20,7 +20,6 @@ if 'sudah_login' not in st.session_state:
     st.session_state['username'] = ""
     st.session_state['role'] = ""
 
-# Layout diubah ke centered agar pas di layar HP
 st.set_page_config(page_title="Simpel Puskesmas", page_icon="🏥", layout="centered")
 
 # ==========================================
@@ -32,19 +31,31 @@ DAFTAR_TAHUN = ["2024", "2025", "2026", "2027", "2028", "2029"]
 LIST_BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 # ==========================================
-# 3. CUSTOM CSS (VERSI MOBILE MODERN)
+# 3. CUSTOM CSS (OBAT ANTI RELOAD & SCROLL LUWES)
 # ==========================================
 st.markdown("""
     <style>
-    /* Latar belakang aplikasi lembut */
-    .stApp { background-color: #f0f4f8; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    /* OBAT ANTI-RELOAD (MEMATIKAN FITUR PULL-TO-REFRESH DI ANDROID) */
+    html, body {
+        overscroll-behavior-y: none !important; 
+        background-color: #f0f4f8;
+    }
+    
+    .stApp { 
+        background-color: #f0f4f8; 
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+        overflow-x: hidden;
+    }
     
     /* Menyembunyikan header/footer bawaan Streamlit yg mengganggu */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     
     /* Memperbaiki Scroll Macet di HP */
-    .block-container { padding-top: 2rem; padding-bottom: 100px; overflow-y: auto; }
+    .block-container { 
+        padding-top: 1rem; 
+        padding-bottom: 100px; 
+    }
     
     /* Desain Kartu (Card) Melengkung */
     .mobile-card {
@@ -62,11 +73,11 @@ st.markdown("""
     .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 10px rgba(2, 132, 199, 0.3); }
     
     /* Tombol Logout Merah */
-    .btn-logout>button { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+    .btn-logout>button { background: linear-gradient(135deg, #ef4444, #b91c1c); padding: 5px 15px;}
     
     /* Status Badge Modern */
-    .badge-sudah { background-color: #ecfdf5; color: #059669; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; }
-    .badge-belum { background-color: #fef2f2; color: #dc2626; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; }
+    .badge-sudah { background-color: #ecfdf5; color: #059669; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; border: 1px solid #a7f3d0;}
+    .badge-belum { background-color: #fef2f2; color: #dc2626; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; border: 1px solid #fecaca;}
     
     /* List File Unduhan */
     .file-item { padding: 12px 0px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;}
@@ -75,10 +86,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. HALAMAN LOGIN (MOBILE UI)
+# 4. HALAMAN LOGIN
 # ==========================================
 if not st.session_state['sudah_login']:
-    st.markdown("<div class='mobile-card' style='margin-top: 10vh;'>", unsafe_allow_html=True)
+    st.markdown("<div class='mobile-card' style='margin-top: 5vh;'>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align: center; color: #0284c7;'>🏥 Simpel Puskesmas</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: gray; font-size: 14px; margin-bottom:20px;'>Portal Laporan & Arsip Digital</p>", unsafe_allow_html=True)
     with st.form("form_login"):
@@ -97,26 +108,25 @@ if not st.session_state['sudah_login']:
     st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA (MENU TANPA SIDEBAR)
+# 5. HALAMAN UTAMA (SETELAH LOGIN)
 # ==========================================
-# Tarik Data dari DB
 respon = supabase.table("status_laporan").select("*").execute()
 df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
 
 # HEADER PROFIL
-col_prof1, col_prof2 = st.columns([3, 1])
+col_prof1, col_prof2 = st.columns([3, 1.5])
 with col_prof1:
     st.markdown(f"**Halo, {st.session_state['username']}!** 👋<br><small style='color:gray;'>Akses: {st.session_state['role']}</small>", unsafe_allow_html=True)
 with col_prof2:
     st.markdown("<div class='btn-logout'>", unsafe_allow_html=True)
-    if st.button("Logout", use_container_width=True):
+    if st.button("🚪 Logout", use_container_width=True):
         st.session_state['sudah_login'] = False
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.write("---")
 
-# DROPDOWN MENU UTAMA (PENGGANTI SIDEBAR)
+# DROPDOWN MENU UTAMA
 if st.session_state['role'] == 'Admin':
     menu = st.selectbox("📌 Pilih Menu Aplikasi:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip", "⚙️ Kelola Akun"])
 elif st.session_state['role'] == 'Kepala Puskesmas':
@@ -124,7 +134,7 @@ elif st.session_state['role'] == 'Kepala Puskesmas':
 else:
     menu = st.selectbox("📌 Pilih Menu Aplikasi:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
 
-st.write("") # Spasi jarak
+st.write("") 
 
 # ------------------------------------------
 # MENU: UPLOAD LAPORAN
@@ -198,7 +208,6 @@ elif menu == "📊 Pantau Kepatuhan":
         st.markdown("".join([f"<span class='badge-belum'>⏳ {p}</span>" for p in program_belum]), unsafe_allow_html=True)
     else: st.success("100% Lapor! 🎉")
 
-    # Fitur Excel
     st.write("---")
     data_rekap = [{"Unit": p, "Status": "Sudah Lapor" if p in program_sudah else "Belum Lapor"} for p in DAFTAR_PROGRAM]
     csv_rekap = pd.DataFrame(data_rekap).to_csv(index=False).encode('utf-8')
@@ -280,7 +289,7 @@ elif menu == "⚙️ Kelola Akun" and st.session_state['role'] == 'Admin':
             else: st.warning("Isi data dengan lengkap.")
             
     st.write("---")
-    st.markdown("**Daftar Akun:**")
+    st.markdown("**Daftar Akun Terdaftar:**")
     res_akun = supabase.table("akun_pengguna").select("username, role").execute()
     if len(res_akun.data) > 0:
         st.dataframe(pd.DataFrame(res_akun.data), use_container_width=True, hide_index=True)

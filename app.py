@@ -4,7 +4,12 @@ import pandas as pd
 from datetime import datetime
 
 # ==========================================
-# 1. KONFIGURASI SUPABASE
+# 1. KONFIGURASI HALAMAN (WAJIB PALING ATAS)
+# ==========================================
+st.set_page_config(page_title="Simpel Puskesmas", page_icon="🏥", layout="centered")
+
+# ==========================================
+# 2. KONFIGURASI SUPABASE
 # ==========================================
 SUPABASE_URL = "https://qawzvmoqgoajewkwzdfl.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFhd3p2bW9xZ29hamV3a3d6ZGZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0MDIyMzAsImV4cCI6MjEwMTk3ODIzMH0.q8dShsEvHf4r6l-Vx_ypguzy_VgX4cE-BO4y1i1g1hc"
@@ -21,42 +26,8 @@ if 'sudah_login' not in st.session_state:
     st.session_state['role'] = ""
     st.session_state['id_puskesmas'] = ""
 
-# Layout lebih rapi
-st.set_page_config(page_title="Simpel Puskesmas", page_icon="🏥", layout="centered")
-
 # ==========================================
-# KODE JUBAH GAIB: PENGHILANG JEJAK STREAMLIT
-# ==========================================
-st.markdown("""
-    <style>
-    /* 1. Menghilangkan tulisan 'Hosted by Streamlit' dan Footer di bawah */
-    footer {visibility: hidden !important;}
-    
-    /* 2. Menghilangkan Header dan Menu Garis Tiga (Burger Menu) di atas */
-    header {visibility: hidden !important;}
-    #MainMenu {visibility: hidden !important;}
-    
-    /* 3. Menghilangkan badge/logo kecil Streamlit yang suka melayang */
-    .viewerBadge_container__1QSob {display: none !important;}
-    .viewerBadge_link__qRIco {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    
-    /* 4. Mengatur jarak layar agar pas dan penuh di layar HP (seperti aplikasi asli) */
-    .block-container { 
-        padding-top: 1rem !important; 
-        padding-bottom: 1rem !important; 
-    }
-    
-    /* 5. Mengunci layar agar tidak bisa ditarik-tarik (Anti-bouncing) */
-    html, body, [class*="css"] {
-        overscroll-behavior-y: none !important;
-        overscroll-behavior-x: none !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# 2. VARIABEL & DAFTAR UNIT
+# 3. VARIABEL & DAFTAR UNIT
 # ==========================================
 DAFTAR_PROGRAM = ["Farmasi", "Gizi", "Ausrem", "KIA/KB", "Promkes", "Kesling", "P2P", "Laboratorium", "Tata Usaha"]
 DAFTAR_ROLE = ["Admin", "Kepala Puskesmas"] + DAFTAR_PROGRAM
@@ -64,14 +35,25 @@ DAFTAR_TAHUN = ["2024", "2025", "2026", "2027", "2028", "2029"]
 LIST_BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 # ==========================================
-# 3. SUPER CSS: UI/UX MODERN & ELEGAN (STARTUP STYLE)
+# 4. SUPER CSS & JUBAH GAIB (UI/UX MODERN)
 # ==========================================
 st.markdown("""
     <style>
     /* Mengambil Font Premium dari Google */
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
-    /* Reset Dasar & Anti Reload */
+    /* ================================================= */
+    /* JUBAH GAIB: MENGHILANGKAN SEMUA JEJAK STREAMLIT   */
+    /* ================================================= */
+    header {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    #MainMenu {visibility: hidden !important;}
+    .viewerBadge_container__1QSob {display: none !important;}
+    .viewerBadge_link__qRIco {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
+
+    /* Reset Dasar & Anti Bouncing */
     html, body, [class*="css"], [data-testid="stAppViewContainer"], .main, .block-container {
         overscroll-behavior-y: none !important;
         overscroll-behavior-x: none !important;
@@ -84,16 +66,8 @@ st.markdown("""
         background-color: #f4f7f9 !important; 
     }
     
-    /* Menghilangkan Sampah Streamlit */
-    header {visibility: hidden !important;}
-    footer {visibility: hidden !important;}
-    #MainMenu {visibility: hidden !important;}
-    .viewerBadge_container__1QSob {display: none !important;}
-    [data-testid="stDecoration"] {display: none !important;}
-    [data-testid="stToolbar"] {display: none !important;}
-    
-    /* Padding Layar HP */
-    .block-container { padding-top: 10px !important; padding-bottom: 80px !important; max-width: 600px; }
+    /* Padding Layar HP biar penuh seperti aplikasi asli */
+    .block-container { padding-top: 15px !important; padding-bottom: 80px !important; max-width: 600px; }
     
     /* KARTU ELEGAN (Glassmorphism ringan) */
     .mobile-card {
@@ -163,7 +137,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. HALAMAN LOGIN (DESAIN STARTUP)
+# 5. HALAMAN LOGIN 
 # ==========================================
 if not st.session_state['sudah_login']:
     st.write("")
@@ -190,7 +164,7 @@ if not st.session_state['sudah_login']:
     st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA
+# 6. HALAMAN UTAMA (DASHBOARD)
 # ==========================================
 pkm_aktif = st.session_state['id_puskesmas']
 
@@ -289,7 +263,6 @@ elif menu == "📊 Pantau Kepatuhan":
     jml_sudah = len(program_sudah)
     persen = int((jml_sudah / len(DAFTAR_PROGRAM)) * 100)
     
-    # Visualisasi Progress Bar Elegan
     st.markdown(f"<p style='font-size: 14px; margin-bottom: 5px;'>Progress Kepatuhan: <strong style='color:#0f172a;'>{persen}%</strong></p>", unsafe_allow_html=True)
     st.progress(persen)
     st.write("")

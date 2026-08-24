@@ -15,7 +15,6 @@ def init_connection():
 
 supabase = init_connection()
 
-# Inisialisasi Status Login
 if 'sudah_login' not in st.session_state:
     st.session_state['sudah_login'] = False
     st.session_state['username'] = ""
@@ -40,7 +39,7 @@ st.markdown("""
     .stButton>button { border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); background-color: #0284c7; color: white; border: none; }
     .stButton>button:hover { background-color: #0369a1; color: white; transform: translateY(-2px); }
     .login-box { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); border-top: 5px solid #0284c7; margin: auto; max-width: 400px; margin-top: 10vh;}
-    .kepatuhan-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    .kepatuhan-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; height: 100%;}
     .progress-bar-bg { background-color: #e2e8f0; border-radius: 10px; height: 14px; width: 100%; overflow: hidden; margin-top: 10px; }
     .progress-bar-fill { background: linear-gradient(90deg, #34d399 0%, #059669 100%); height: 100%; border-radius: 10px; transition: width 0.8s ease-in-out; }
     .badge-sudah { background-color: #ecfdf5; color: #065f46; padding: 8px 16px; border-radius: 20px; display: inline-block; margin: 5px; font-weight: bold; font-size: 13px; border: 1px solid #a7f3d0; }
@@ -52,7 +51,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. SISTEM PINTU MASUK (LOGIN)
+# 4. SISTEM LOGIN
 # ==========================================
 if not st.session_state['sudah_login']:
     st.markdown("<div class='login-box'>", unsafe_allow_html=True)
@@ -71,12 +70,11 @@ if not st.session_state['sudah_login']:
             else:
                 st.error("❌ Username atau Password salah!")
     st.markdown("</div>", unsafe_allow_html=True)
-    st.stop() # Menghentikan kode di sini agar menu lain tidak bocor
+    st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA (SETELAH LOGIN)
+# 5. HALAMAN UTAMA & SIDEBAR
 # ==========================================
-# Sidebar Navigasi Dinamis (Menyesuaikan Role)
 st.sidebar.title("🏥 Navigasi")
 st.sidebar.markdown(f"👤 **{st.session_state['username']}**<br><small>({st.session_state['role']})</small>", unsafe_allow_html=True)
 st.sidebar.write("---")
@@ -85,7 +83,7 @@ if st.session_state['role'] == 'Admin':
     menu = st.sidebar.radio("Pilih Menu:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip", "⚙️ Kelola Akun"])
 elif st.session_state['role'] == 'Kepala Puskesmas':
     menu = st.sidebar.radio("Pilih Menu:", ["📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
-else: # Untuk Unit-unit (Farmasi, KIA, dll)
+else:
     menu = st.sidebar.radio("Pilih Menu:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
 
 st.sidebar.write("---")
@@ -93,7 +91,6 @@ if st.sidebar.button("🚪 Keluar Aplikasi", use_container_width=True):
     st.session_state['sudah_login'] = False
     st.rerun()
 
-# Menarik Data Laporan dari Server untuk digunakan di berbagai menu
 respon = supabase.table("status_laporan").select("*").execute()
 df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
 
@@ -108,8 +105,6 @@ if menu == "📤 Upload Laporan":
     col1, col2 = st.columns([1, 1.5])
     with col1:
         st.markdown("### 📝 Identitas Laporan")
-        
-        # Logika Penguncian Unit
         if st.session_state['role'] in DAFTAR_PROGRAM:
             instansi = st.selectbox("1. Unit / Program:", [st.session_state['role']], disabled=True)
         else:
@@ -144,7 +139,7 @@ if menu == "📤 Upload Laporan":
                 st.warning("⚠️ Mohon lengkapi pilihan Unit dan masukkan filenya!")
 
 # ------------------------------------------
-# MENU: PANTAU KEPATUHAN
+# MENU: PANTAU KEPATUHAN (DENGAN FITUR EXCEL)
 # ------------------------------------------
 elif menu == "📊 Pantau Kepatuhan":
     st.header("🎯 Pantau Kepatuhan Pelaporan")
@@ -192,6 +187,34 @@ elif menu == "📊 Pantau Kepatuhan":
         else: st.success("Luar biasa! 100% unit sudah lapor! 🎉")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # FITUR DOWNLOAD EXCEL (CSV) REKAP KEPATUHAN
+    st.write("---")
+    st.markdown("#### 📥 Unduh Laporan Rekapitulasi")
+    
+    # Merakit data untuk excel
+    data_rekap = []
+    for p in DAFTAR_PROGRAM:
+        status_lapor = "Sudah Lapor" if p in program_sudah else "Belum Lapor"
+        data_rekap.append({
+            "Nama Unit": p,
+            "Kategori Laporan": dash_jenis,
+            "Bulan": dash_bulan,
+            "Tahun": dash_tahun,
+            "Status": status_lapor
+        })
+    df_rekap = pd.DataFrame(data_rekap)
+    csv_rekap = df_rekap.to_csv(index=False).encode('utf-8')
+    
+    col_dl, col_blank = st.columns([1, 2])
+    with col_dl:
+        st.download_button(
+            label="📊 Download Rekap Data (Excel/CSV)",
+            data=csv_rekap,
+            file_name=f"Rekap_Kepatuhan_{dash_jenis}_{dash_bulan}_{dash_tahun}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
 # ------------------------------------------
 # MENU: GUDANG ARSIP
 # ------------------------------------------
@@ -213,14 +236,11 @@ elif menu == "📂 Gudang Arsip":
         urutan_bulan = {"Januari":1, "Februari":2, "Maret":3, "April":4, "Mei":5, "Juni":6, "Juli":7, "Agustus":8, "September":9, "Oktober":10, "November":11, "Desember":12, "Tahunan":13}
         df_arsip['Urutan_Bulan'] = df_arsip['Bulan'].map(urutan_bulan)
 
-        # Logika Filter Folder Berdasarkan Role
         if st.session_state['role'] in DAFTAR_PROGRAM:
-            # Jika Unit, HANYA BISA LIHAT ARSIP MILIK MEREKA
             df_arsip = df_arsip[df_arsip['nama_instansi'] == st.session_state['role']]
             filter_tahun_arsip = st.selectbox("Tampilkan Arsip Tahun:", DAFTAR_TAHUN, index=2)
             df_arsip = df_arsip[df_arsip['Tahun'] == filter_tahun_arsip]
         else:
-            # Jika Admin / Kepala Puskesmas, BISA LIHAT SEMUA ARSIP
             filter_tahun_arsip = st.selectbox("Tampilkan Arsip Tahun:", ["Semua Tahun"] + DAFTAR_TAHUN, index=0)
             if filter_tahun_arsip != "Semua Tahun":
                 df_arsip = df_arsip[df_arsip['Tahun'] == filter_tahun_arsip]
@@ -281,7 +301,6 @@ elif menu == "⚙️ Kelola Akun" and st.session_state['role'] == 'Admin':
             
             if st.form_submit_button("Simpan Akun ✅"):
                 if baru_user and baru_pass:
-                    # Cek apakah username sudah ada
                     cek = supabase.table("akun_pengguna").select("*").eq("username", baru_user).execute()
                     if len(cek.data) > 0:
                         st.error("❌ Username sudah terpakai, pilih nama lain!")

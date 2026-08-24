@@ -31,51 +31,67 @@ DAFTAR_TAHUN = ["2024", "2025", "2026", "2027", "2028", "2029"]
 LIST_BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 # ==========================================
-# 3. SUPER CSS ANTI-RELOAD & DESAIN MODERN
+# 3. SUPER CSS: UI PREMIUM & PEMBERSIH WATERMARK
 # ==========================================
 st.markdown("""
     <style>
-    /* KUNCI GANDA ANTI-RELOAD UNTUK ANDROID/IOS */
+    /* 1. OBAT ANTI-RELOAD & BACKGROUND LEMBUT */
     html, body, [class*="css"], [data-testid="stAppViewContainer"], .main, .block-container {
         overscroll-behavior-y: none !important;
         overscroll-behavior-x: none !important;
         touch-action: pan-y !important;
     }
-    
     .stApp { 
-        background-color: #f0f4f8; 
+        background-color: #f8fafc !important; 
         font-family: 'Segoe UI', Roboto, sans-serif; 
     }
     
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
+    /* 2. PEMBUNUH WATERMARK STREAMLIT & HEADER/FOOTER */
+    header {visibility: hidden !important;}
+    footer {visibility: hidden !important;}
+    #MainMenu {visibility: hidden !important;}
+    .viewerBadge_container__1QSob {display: none !important;}
+    .viewerBadge_link__1S137 {display: none !important;}
+    [data-testid="stDecoration"] {display: none !important;}
+    [data-testid="stToolbar"] {display: none !important;}
     
-    /* Perbaikan Jarak Atas-Bawah */
-    .block-container { padding-top: 20px; padding-bottom: 80px; }
+    /* 3. PERBAIKAN JARAK AMAN */
+    .block-container { padding-top: 15px !important; padding-bottom: 80px !important; }
     
-    /* Desain Kartu Melengkung */
+    /* 4. DESAIN KARTU MODERN (CLEAN UI) */
     .mobile-card {
-        background: white; padding: 20px; border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px;
-        border: 1px solid #e1e8ed;
+        background: #ffffff; 
+        padding: 24px; 
+        border-radius: 16px;
+        box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 20px;
     }
     
-    /* Desain Tombol ala Aplikasi Modern */
+    /* 5. DESAIN TOMBOL ALA APLIKASI MAHAL */
     .stButton>button {
-        border-radius: 50px; background: linear-gradient(135deg, #0ea5e9, #0284c7);
-        color: white; font-weight: 600; border: none; padding: 10px 20px;
-        box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2); transition: all 0.3s ease; width: 100%;
+        border-radius: 12px !important; 
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+        color: white !important; 
+        font-weight: 600 !important; 
+        border: none !important; 
+        padding: 10px 20px !important;
+        box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important; 
+        width: 100%;
+        transition: all 0.3s ease;
     }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 10px rgba(2, 132, 199, 0.3); }
+    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(2, 132, 199, 0.3) !important; }
     
     /* Tombol Logout Merah */
-    .btn-logout>button { background: linear-gradient(135deg, #ef4444, #b91c1c); padding: 5px 15px;}
+    .btn-logout>button { background: linear-gradient(135deg, #ef4444, #b91c1c) !important; padding: 5px 15px !important;}
     
-    /* Status Badge Modern */
+    /* Input & Select Box Lebih Halus */
+    .stTextInput input, .stSelectbox select { border-radius: 8px !important; }
+    
+    /* Badge Status */
     .badge-sudah { background-color: #ecfdf5; color: #059669; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; border: 1px solid #a7f3d0;}
     .badge-belum { background-color: #fef2f2; color: #dc2626; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 12px; display: inline-block; margin: 3px; border: 1px solid #fecaca;}
     
-    /* List File Unduhan */
     .file-item { padding: 12px 0px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center;}
     .file-item a { text-decoration: none; color: white; background-color: #0ea5e9; padding: 6px 15px; border-radius: 20px; font-weight: bold; font-size: 12px; }
     </style>
@@ -85,12 +101,13 @@ st.markdown("""
 # 4. HALAMAN LOGIN
 # ==========================================
 if not st.session_state['sudah_login']:
-    st.markdown("<div class='mobile-card' style='margin-top: 5vh;'>", unsafe_allow_html=True)
-    st.markdown("<h2 style='text-align: center; color: #0284c7;'>🏥 Simpel Puskesmas</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray; font-size: 14px; margin-bottom:20px;'>Portal Laporan & Arsip Digital</p>", unsafe_allow_html=True)
+    st.markdown("<div class='mobile-card' style='margin-top: 10vh;'>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #0284c7; margin-bottom: 5px;'>🏥 Simpel Puskesmas</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748b; font-size: 14px; margin-bottom:25px;'>Portal Laporan & Arsip Digital</p>", unsafe_allow_html=True)
     with st.form("form_login"):
         input_user = st.text_input("👤 Username")
         input_pass = st.text_input("🔑 Password", type="password")
+        st.write("")
         if st.form_submit_button("Masuk Aplikasi ➡️"):
             cek_akun = supabase.table("akun_pengguna").select("*").eq("username", input_user).eq("password", input_pass).execute()
             if len(cek_akun.data) > 0:
@@ -104,7 +121,7 @@ if not st.session_state['sudah_login']:
     st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA
+# 5. HALAMAN UTAMA (SETELAH LOGIN)
 # ==========================================
 respon = supabase.table("status_laporan").select("*").execute()
 df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
@@ -112,7 +129,7 @@ df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame(
 # HEADER PROFIL
 col_prof1, col_prof2 = st.columns([3, 1.5])
 with col_prof1:
-    st.markdown(f"**Halo, {st.session_state['username']}!** 👋<br><small style='color:gray;'>Akses: {st.session_state['role']}</small>", unsafe_allow_html=True)
+    st.markdown(f"**Halo, {st.session_state['username']}!** 👋<br><small style='color:#64748b;'>Akses: {st.session_state['role']}</small>", unsafe_allow_html=True)
 with col_prof2:
     st.markdown("<div class='btn-logout'>", unsafe_allow_html=True)
     if st.button("🚪 Logout"):
@@ -124,11 +141,11 @@ st.write("---")
 
 # DROPDOWN MENU UTAMA
 if st.session_state['role'] == 'Admin':
-    menu = st.selectbox("📌 Pilih Menu Aplikasi:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip", "⚙️ Kelola Akun"])
+    menu = st.selectbox("📌 Navigasi Menu:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip", "⚙️ Kelola Akun"])
 elif st.session_state['role'] == 'Kepala Puskesmas':
-    menu = st.selectbox("📌 Pilih Menu Aplikasi:", ["📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
+    menu = st.selectbox("📌 Navigasi Menu:", ["📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
 else:
-    menu = st.selectbox("📌 Pilih Menu Aplikasi:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
+    menu = st.selectbox("📌 Navigasi Menu:", ["📤 Upload Laporan", "📊 Pantau Kepatuhan", "📂 Gudang Arsip"])
 
 st.write("") 
 
@@ -137,7 +154,7 @@ st.write("")
 # ------------------------------------------
 if menu == "📤 Upload Laporan":
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0;'>📤 Kirim Laporan</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>📤 Kirim Laporan</h3>", unsafe_allow_html=True)
     
     if st.session_state['role'] in DAFTAR_PROGRAM:
         instansi = st.selectbox("1. Unit / Program:", [st.session_state['role']], disabled=True)
@@ -149,9 +166,10 @@ if menu == "📤 Upload Laporan":
     bulan_laporan = st.selectbox("4. Bulan:", LIST_BULAN) if jenis_laporan == "Bulanan" else "Tahunan"
     file_upload = st.file_uploader("5. Pilih File (PDF/Excel)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
     
+    st.write("")
     if st.button("🚀 Upload Sekarang"):
         if instansi != "Pilih Program..." and file_upload is not None:
-            with st.spinner('Proses pengiriman...'):
+            with st.spinner('Mengirim ke server aman...'):
                 try:
                     timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
                     nama_file = f"{instansi}_{jenis_laporan}_{bulan_laporan}_{tahun_laporan}_{timestamp}_{file_upload.name}"
@@ -163,7 +181,7 @@ if menu == "📤 Upload Laporan":
                 except Exception as e:
                     st.error(f"❌ Gagal: {e}")
         else:
-            st.warning("⚠️ Pilih Unit dan masukkan file!")
+            st.warning("⚠️ Pilih Unit dan masukkan file laporan Anda!")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -171,7 +189,7 @@ if menu == "📤 Upload Laporan":
 # ------------------------------------------
 elif menu == "📊 Pantau Kepatuhan":
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0;'>🎯 Pantau Kepatuhan</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>🎯 Pantau Kepatuhan</h3>", unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     with c1: dash_jenis = st.selectbox("Kategori:", ["Bulanan", "Tahunan"])
@@ -196,12 +214,12 @@ elif menu == "📊 Pantau Kepatuhan":
     st.markdown("#### ✅ Sudah Lapor")
     if program_sudah:
         st.markdown("".join([f"<span class='badge-sudah'>✔️ {p}</span>" for p in program_sudah]), unsafe_allow_html=True)
-    else: st.info("Belum ada unit lapor.")
+    else: st.info("Belum ada unit yang lapor.")
         
     st.markdown("#### ⏳ Belum Lapor")
     if program_belum:
         st.markdown("".join([f"<span class='badge-belum'>⏳ {p}</span>" for p in program_belum]), unsafe_allow_html=True)
-    else: st.success("100% Lapor! 🎉")
+    else: st.success("Luar Biasa! 100% Lapor! 🎉")
 
     st.write("---")
     data_rekap = [{"Unit": p, "Status": "Sudah Lapor" if p in program_sudah else "Belum Lapor"} for p in DAFTAR_PROGRAM]
@@ -214,7 +232,7 @@ elif menu == "📊 Pantau Kepatuhan":
 # ------------------------------------------
 elif menu == "📂 Gudang Arsip":
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0;'>📂 Gudang Arsip</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>📂 Gudang Arsip</h3>", unsafe_allow_html=True)
     
     if not df_status.empty:
         def urai_status(teks):
@@ -249,18 +267,18 @@ elif menu == "📂 Gudang Arsip":
                             nf = row['nama_file']
                             link_dl = f"{SUPABASE_URL}/storage/v1/object/public/laporan_files/{nf}"
                             st.markdown(f"<div class='file-item'><span>📄 {nf.split('_', 5)[-1][:20]}...</span><a href='{link_dl}' target='_blank'>Unduh</a></div>", unsafe_allow_html=True)
-        else: st.info(f"Belum ada arsip.")
+        else: st.info(f"Belum ada arsip pada filter ini.")
         
         if st.session_state['role'] == 'Admin':
             st.write("---")
-            with st.expander("🗑️ Hapus Dokumen"):
+            with st.expander("🗑️ Hapus Dokumen Permanen"):
                 hapus_file = st.selectbox("Pilih file:", df_status['nama_file'].tolist())
                 if st.button("Hapus Permanen", type="primary"):
                     supabase.table("status_laporan").delete().eq("nama_file", hapus_file).execute()
                     supabase.storage.from_("laporan_files").remove([hapus_file])
-                    st.success("Terhapus!")
+                    st.success("File Terhapus!")
                     st.rerun()
-    else: st.info("Arsip masih kosong.")
+    else: st.info("Gudang Arsip saat ini masih kosong.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -268,20 +286,21 @@ elif menu == "📂 Gudang Arsip":
 # ------------------------------------------
 elif menu == "⚙️ Kelola Akun" and st.session_state['role'] == 'Admin':
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0;'>⚙️ Buat Akun Unit</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>⚙️ Manajemen Akun</h3>", unsafe_allow_html=True)
     
     with st.form("form_tambah_akun"):
         baru_user = st.text_input("Username (Tanpa Spasi)")
         baru_pass = st.text_input("Password")
         baru_role = st.selectbox("Role / Unit Bagian", DAFTAR_ROLE)
+        st.write("")
         if st.form_submit_button("Simpan Akun ✅"):
             if baru_user and baru_pass:
                 cek = supabase.table("akun_pengguna").select("*").eq("username", baru_user).execute()
-                if len(cek.data) > 0: st.error("❌ Username terpakai!")
+                if len(cek.data) > 0: st.error("❌ Username sudah terpakai!")
                 else:
                     supabase.table("akun_pengguna").insert({"username": baru_user.replace(" ", ""), "password": baru_pass, "role": baru_role}).execute()
-                    st.success(f"Akun '{baru_user}' terdaftar!")
-            else: st.warning("Isi data dengan lengkap.")
+                    st.success(f"Akun '{baru_user}' berhasil didaftarkan!")
+            else: st.warning("Mohon isi semua data dengan lengkap.")
             
     st.write("---")
     st.markdown("**Daftar Akun Terdaftar:**")

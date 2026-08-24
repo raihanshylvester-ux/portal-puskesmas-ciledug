@@ -31,33 +31,29 @@ DAFTAR_TAHUN = ["2024", "2025", "2026", "2027", "2028", "2029"]
 LIST_BULAN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"]
 
 # ==========================================
-# 3. CUSTOM CSS (OBAT ANTI RELOAD & SCROLL LUWES)
+# 3. SUPER CSS ANTI-RELOAD & DESAIN MODERN
 # ==========================================
 st.markdown("""
     <style>
-    /* OBAT ANTI-RELOAD (MEMATIKAN FITUR PULL-TO-REFRESH DI ANDROID) */
-    html, body {
-        overscroll-behavior-y: none !important; 
-        background-color: #f0f4f8;
+    /* KUNCI GANDA ANTI-RELOAD UNTUK ANDROID/IOS */
+    html, body, [class*="css"], [data-testid="stAppViewContainer"], .main, .block-container {
+        overscroll-behavior-y: none !important;
+        overscroll-behavior-x: none !important;
+        touch-action: pan-y !important;
     }
     
     .stApp { 
         background-color: #f0f4f8; 
-        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
-        overflow-x: hidden;
+        font-family: 'Segoe UI', Roboto, sans-serif; 
     }
     
-    /* Menyembunyikan header/footer bawaan Streamlit yg mengganggu */
     header {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Memperbaiki Scroll Macet di HP */
-    .block-container { 
-        padding-top: 1rem; 
-        padding-bottom: 100px; 
-    }
+    /* Perbaikan Jarak Atas-Bawah */
+    .block-container { padding-top: 20px; padding-bottom: 80px; }
     
-    /* Desain Kartu (Card) Melengkung */
+    /* Desain Kartu Melengkung */
     .mobile-card {
         background: white; padding: 20px; border-radius: 16px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px;
@@ -68,7 +64,7 @@ st.markdown("""
     .stButton>button {
         border-radius: 50px; background: linear-gradient(135deg, #0ea5e9, #0284c7);
         color: white; font-weight: 600; border: none; padding: 10px 20px;
-        box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2); transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2); transition: all 0.3s ease; width: 100%;
     }
     .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 6px 10px rgba(2, 132, 199, 0.3); }
     
@@ -95,7 +91,7 @@ if not st.session_state['sudah_login']:
     with st.form("form_login"):
         input_user = st.text_input("👤 Username")
         input_pass = st.text_input("🔑 Password", type="password")
-        if st.form_submit_button("Masuk Aplikasi ➡️", use_container_width=True):
+        if st.form_submit_button("Masuk Aplikasi ➡️"):
             cek_akun = supabase.table("akun_pengguna").select("*").eq("username", input_user).eq("password", input_pass).execute()
             if len(cek_akun.data) > 0:
                 st.session_state['sudah_login'] = True
@@ -108,7 +104,7 @@ if not st.session_state['sudah_login']:
     st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA (SETELAH LOGIN)
+# 5. HALAMAN UTAMA
 # ==========================================
 respon = supabase.table("status_laporan").select("*").execute()
 df_status = pd.DataFrame(respon.data) if len(respon.data) > 0 else pd.DataFrame()
@@ -119,7 +115,7 @@ with col_prof1:
     st.markdown(f"**Halo, {st.session_state['username']}!** 👋<br><small style='color:gray;'>Akses: {st.session_state['role']}</small>", unsafe_allow_html=True)
 with col_prof2:
     st.markdown("<div class='btn-logout'>", unsafe_allow_html=True)
-    if st.button("🚪 Logout", use_container_width=True):
+    if st.button("🚪 Logout"):
         st.session_state['sudah_login'] = False
         st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
@@ -151,10 +147,9 @@ if menu == "📤 Upload Laporan":
     jenis_laporan = st.radio("2. Kategori Laporan:", ["Bulanan", "Tahunan"], horizontal=True)
     tahun_laporan = st.selectbox("3. Tahun:", DAFTAR_TAHUN, index=2) 
     bulan_laporan = st.selectbox("4. Bulan:", LIST_BULAN) if jenis_laporan == "Bulanan" else "Tahunan"
-    
     file_upload = st.file_uploader("5. Pilih File (PDF/Excel)", type=['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv'])
     
-    if st.button("🚀 Upload Sekarang", use_container_width=True):
+    if st.button("🚀 Upload Sekarang"):
         if instansi != "Pilih Program..." and file_upload is not None:
             with st.spinner('Proses pengiriman...'):
                 try:
@@ -211,7 +206,7 @@ elif menu == "📊 Pantau Kepatuhan":
     st.write("---")
     data_rekap = [{"Unit": p, "Status": "Sudah Lapor" if p in program_sudah else "Belum Lapor"} for p in DAFTAR_PROGRAM]
     csv_rekap = pd.DataFrame(data_rekap).to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Download Rekap Excel", data=csv_rekap, file_name=f"Rekap_{dash_bulan}.csv", mime="text/csv", use_container_width=True)
+    st.download_button("📥 Download Rekap Excel", data=csv_rekap, file_name=f"Rekap_{dash_bulan}.csv", mime="text/csv")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -279,7 +274,7 @@ elif menu == "⚙️ Kelola Akun" and st.session_state['role'] == 'Admin':
         baru_user = st.text_input("Username (Tanpa Spasi)")
         baru_pass = st.text_input("Password")
         baru_role = st.selectbox("Role / Unit Bagian", DAFTAR_ROLE)
-        if st.form_submit_button("Simpan Akun ✅", use_container_width=True):
+        if st.form_submit_button("Simpan Akun ✅"):
             if baru_user and baru_pass:
                 cek = supabase.table("akun_pengguna").select("*").eq("username", baru_user).execute()
                 if len(cek.data) > 0: st.error("❌ Username terpakai!")

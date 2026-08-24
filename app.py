@@ -105,7 +105,6 @@ if not st.session_state['sudah_login']:
                 st.session_state['sudah_login'] = True
                 st.session_state['username'] = cek_akun.data[0]['username']
                 st.session_state['role'] = cek_akun.data[0]['role']
-                # Tangkap id_puskesmas dari database (jika kosong, set default PKM_UTAMA)
                 pkm_db = cek_akun.data[0].get('id_puskesmas')
                 st.session_state['id_puskesmas'] = pkm_db if pkm_db else "PKM_UTAMA"
                 st.rerun()
@@ -115,7 +114,7 @@ if not st.session_state['sudah_login']:
     st.stop()
 
 # ==========================================
-# 5. HALAMAN UTAMA (DENGAN ISOLASI DATA MULTI-TENANCY)
+# 5. HALAMAN UTAMA (ISOLASI DATA KETAT)
 # ==========================================
 pkm_aktif = st.session_state['id_puskesmas']
 
@@ -268,7 +267,6 @@ elif menu == "📂 Gudang Arsip":
                         for _, row in data_bulan.iterrows():
                             nf = row['nama_file']
                             link_dl = f"{SUPABASE_URL}/storage/v1/object/public/laporan_files/{nf}"
-                            # Menampilkan nama file asli tanpa prefix id_puskesmas
                             nama_tampil = "_".join(nf.split('_')[1:]) if len(nf.split('_')) > 1 else nf
                             st.markdown(f"<div class='file-item'><span>📄 {nama_tampil[:25]}...</span><a href='{link_dl}' target='_blank'>Unduh</a></div>", unsafe_allow_html=True)
         else: st.info(f"Belum ada arsip pada filter ini.")
@@ -286,37 +284,68 @@ elif menu == "📂 Gudang Arsip":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ------------------------------------------
-# MENU: KELOLA AKUN (DENGAN INPUT ID PUSKESMAS)
+# MENU: KELOLA AKUN (TERISOLASI & FITUR GANTI PASSWORD)
 # ------------------------------------------
 elif menu == "⚙️ Kelola Akun" and st.session_state['role'] == 'Admin':
     st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
-    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>⚙️ Manajemen Akun Multi-Puskesmas</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>⚙️ Manajemen Akun ({pkm_aktif})</h3>", unsafe_allow_html=True)
     
+    # Form Tambah Akun (Otomatis masuk ke id_puskesmas admin yang sedang login)
     with st.form("form_tambah_akun"):
-        baru_pkm = st.text_input("ID Puskesmas / Instansi (Contoh: PKM_CILEDUG)")
+        st.markdown(f"**Tambah Akun Baru untuk Puskesmas Anda:** `{pkm_aktif}`")
         baru_user = st.text_input("Username (Tanpa Spasi)")
-        baru_pass = st.text_input("Password")
+        baru_pass = st.text_input("Password", type="password")
         baru_role = st.selectbox("Role / Unit Bagian", DAFTAR_ROLE)
         st.write("")
-        if st.form_submit_button("Simpan Akun ✅"):
-            if baru_pkm and baru_user and baru_pass:
+        if st.form_submit_button("Simpan Akun Baru ✅"):
+            if baru_user and baru_pass:
                 cek = supabase.table("akun_pengguna").select("*").eq("username", baru_user).execute()
-                if len(cek.data) > 0: st.error("❌ Username sudah terpakai!")
+                if len(cek.data) > 0: st.error("❌ Username sudah terpakai di sistem!")
                 else:
                     supabase.table("akun_pengguna").insert({
                         "username": baru_user.replace(" ", ""), 
                         "password": baru_pass, 
                         "role": baru_role,
-                        "id_puskesmas": baru_pkm.upper().replace(" ", "_")
+                        "id_puskesmas": pkm_aktif  # Dikunci otomatis ke Puskesmas admin yang login
                     }).execute()
-                    st.success(f"Akun '{baru_user}' untuk Puskesmas '{baru_pkm}' berhasil didaftarkan!")
-            else: st.warning("Mohon isi semua data (ID Puskesmas, Username, Password) dengan lengkap.")
+                    st.success(f"Akun '{baru_user}' berhasil didaftarkan untuk {pkm_aktif}!")
+            else: st.warning("Mohon isi Username dan Password.")
             
     st.write("---")
-    st.markdown("**Daftar Akun Terdaftar:**")
-    res_akun = supabase.table("akun_pengguna").select("username, role, id_puskesmas").execute()
+    st.markdown(f"**📋 Daftar Akun di Puskesmas Anda ({pkm_aktif}):**")
+    
+    # AMBIL DATA AKUN HANYA UNTUK PUSKESMAS INI SAJA!
+    res_akun = supabase.table("akun_pengguna").select("username, role, id_puskesmas").eq("id_puskesmas", pkm_aktif).execute()
     if len(res_akun.data) > 0:
         df_akun = pd.DataFrame(res_akun.data)
         df_akun.columns = ["Username", "Role / Unit", "ID Puskesmas"]
         st.dataframe(df_akun, use_container_width=True, hide_index=True)
+    else:
+        st.write("Belum ada akun lain terdaftar.")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # MENU KEAMANAN: GANTI PASSWORD
+    st.markdown("<div class='mobile-card'>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #0284c7; margin-top:0; margin-bottom: 20px;'>🔐 Keamanan & Sandi</h3>", unsafe_allow_html=True)
+    with st.form("form_ganti_password"):
+        st.markdown(f"Ganti Password untuk akun aktif: **{st.session_state['username']}**")
+        pass_lama = st.text_input("Password Lama", type="password")
+        pass_baru = st.text_input("Password Baru", type="password")
+        pass_konfirmasi = st.text_input("Konfirmasi Password Baru", type="password")
+        st.write("")
+        if st.form_submit_button("Perbarui Password 🔒"):
+            if pass_lama and pass_baru and pass_konfirmasi:
+                # Cek password lama benar atau tidak
+                cek_lama = supabase.table("akun_pengguna").select("*").eq("username", st.session_state['username']).eq("password", pass_lama).execute()
+                if len(cek_lama.data) > 0:
+                    if pass_baru == pass_konfirmasi:
+                        supabase.table("akun_pengguna").update({"password": pass_baru}).eq("username", st.session_state['username']).execute()
+                        st.success("✅ Password berhasil diperbarui! Gunakan password baru saat login berikutnya.")
+                    else:
+                        st.error("❌ Password baru dan konfirmasi tidak cocok!")
+                else:
+                    st.error("❌ Password lama salah!")
+            else:
+                st.warning("⚠️ Mohon lengkapi semua kolom ganti password.")
     st.markdown("</div>", unsafe_allow_html=True)
